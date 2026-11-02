@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>門市限定・野生雷達抓寶</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      background: radial-gradient(circle at center, #1b263b 0%, #0d1b2a 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 100vh;
+      overflow: hidden;
+      padding: 24px 16px;
+    }
+
+    .top-bar { width: 100%; max-width: 320px; text-align: center; }
+    .top-bar h1 { font-size: 1.2rem; color: #48cae4; margin-bottom: 4px; }
+    .status-pill {
+      display: inline-block;
+      font-size: 0.8rem;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 12px;
+      border-radius: 20px;
+      color: #90e0ef;
+    }
+
+    /* 雷達視窗 */
+    .radar-wrapper {
+      position: relative;
+      width: 320px;
+      height: 360px;
+      background: radial-gradient(circle, #1e3d59 0%, #17252a 80%);
+      border: 3px solid #48cae4;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
+    }
+
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; }
+
+    .radar-scanner {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: conic-gradient(from 0deg, rgba(72, 202, 228, 0.35) 0deg, transparent 60deg);
+      animation: scan 2s linear infinite;
+      pointer-events: none;
+      display: none;
+    }
+    @keyframes scan {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .tip-text { font-size: 0.85rem; color: #adb5bd; margin-bottom: 8px; text-align: center; }
+
+    /* 彈窗樣式 */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border: 2px solid #48cae4;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+    }
+    .card h3 { font-size: 1.35rem; margin-bottom: 8px; }
+    .card p { font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 16px; }
+
+    /* 消費驗證輸入框 */
+    .code-input {
+      width: 180px;
+      font-size: 1.5rem;
+      letter-spacing: 6px;
+      text-align: center;
+      padding: 8px 12px;
+      border: 2px solid #48cae4;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #fff;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    
+    .coupon-box {
+      background: #fff;
+      color: #0f172a;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+      border-left: 6px dashed #48cae4;
+      text-align: center;
+    }
+    .coupon-name { font-size: 1.15rem; font-weight: bold; color: #0284c7; }
+    .countdown { font-size: 0.75rem; color: #e11d48; margin-top: 4px; font-weight: bold; }
+
+    .btn {
+      background: #48cae4;
+      color: #0b132b;
+      border: none;
+      font-weight: bold;
+      padding: 12px 24px;
+      border-radius: 25px;
+      width: 100%;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .btn-redeem { background: #e11d48; color: #fff; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <h1>門市野生尋寶雷達</h1>
+    <div class="status-pill" id="statusPill">正在驗證店內位置...</div>
+  </div>
+
+  <div class="radar-wrapper">
+    <div class="radar-scanner" id="scanner"></div>
+    <canvas id="gameCanvas" width="320" height="360"></canvas>
+  </div>
+
+  <div class="tip-text" id="tipText">雷達定位中，請允許手機定位權限...</div>
+
+  <!-- 消費驗證彈窗 -->
+  <div class="modal" id="authModal">
+    <div class="card">
+      <h3 style="color: #38bdf8;">🔒 啟動雷達鎖定</h3>
+      <p>本活動限定<b>店內消費（不限金額）</b>參與。<br>請輸入結帳單上的 4 位數抓寶通關碼：</p>
+      <input type="number" pattern="[0-9]*" class="code-input" id="passcodeInput" placeholder="••••" maxlength="4">
+      <button class="btn" onclick="verifyReceiptCode()">解鎖雷達開抓</button>
+      <p id="authError" style="color: #fb7185; font-size: 0.8rem; margin-top: 10px; display: none;">通關碼錯誤，請洽櫃檯店員</p>
+    </div>
+  </div>
+
+  <!-- 結果 / 阻擋彈窗 -->
+  <div class="modal" id="resultModal">
+    <div class="card">
+      <h3 id="modalTitle">探測結果</h3>
+      <p id="modalDesc"></p>
+
+      <!-- 中獎折價券區塊 -->
+      <div id="prizeSection" style="display: none;">
+        <div class="coupon-box">
+          <div class="coupon-name" id="couponText">全單 9 折折價券</div>
+          <div class="countdown" id="timer">請於 15:00 內出示給店員核銷</div>
+        </div>
+        <button class="btn btn-redeem" onclick="redeemCoupon()">店員專用核銷按鈕</button>
+      </div>
+
+      <button class="btn" id="closeBtn" style="margin-top: 10px;" onclick="closeModal()">確認</button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // ⚙️ 門市參數設定（日後可微調）
+    // ==========================================
+    const STORE_CONFIG = {
+      passcode: "8888",      // 今日消費通關碼（預設 8888，可隨時改）
+      lat: 23.00000,         // 店面緯度（貼上 Google 地圖數字）
+      lng: 120.20000,        // 店面經度（貼上 Google 地圖數字）
+      radiusMeters: 50,      // 限定距離半徑（50 公尺涵蓋店內與門口）
+      openMins: 6 * 60 + 30, // 開放時間 06:30
+      closeMins: 12 * 60     // 結束時間 12:00
+    };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusPill = document.getElementById('statusPill');
+    const tipText = document.getElementById('tipText');
+    const scanner = document.getElementById('scanner');
+    const authModal = document.getElementById('authModal');
+    const authError = document.getElementById('authError');
+    const modal = document.getElementById('resultModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDesc = document.getElementById('modalDesc');
+    const prizeSection = document.getElementById('prizeSection');
+    const couponText = document.getElementById('couponText');
+    const closeBtn = document.getElementById('closeBtn');
+
+    // 隨機怪獸池
+    const MONSTER_TYPES = [
+      { name: "野生綠寶怪", emoji: "🥪", speed: 1.5, prize: "謝謝光臨", desc: "野生優惠溜走了～明天再來試試！", weight: 0.55 },
+      { name: "稀有紫光獸", emoji: "☕", speed: 2.3, prize: "全單 9 折折價券", desc: "恭喜收服！結帳出示畫面可折抵！", weight: 0.35 },
+      { name: "傳說金冠龍", emoji: "👑", speed: 3.5, prize: "50 元現金抵用券", desc: "太狂了！抓到傳說神獸！", weight: 0.10 }
+    ];
+
+    let currentMonster = null;
+    let isSpawned = false;
+    let ball = { x: 160, y: 310, radius: 18, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
+    let isShaking = false;
+    let shakeCount = 0;
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function checkHours() {
+      const now = new Date();
+      const current = now.getHours() * 60 + now.getMinutes();
+      return current >= STORE_CONFIG.openMins && current <= STORE_CONFIG.closeMins;
+    }
+
+    function initLocationCheck() {
+      if (!checkHours()) {
+        blockUser("雷達休眠中", "野生尋寶僅限營業時段 06:30 - 12:00 開啟，明早再來！");
+        return;
+      }
+
+      if (!navigator.geolocation) {
+        blockUser("無法定位", "您的裝置不支援定位，無法啟動店內雷達。");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const dist = getDistance(pos.coords.latitude, pos.coords.longitude, STORE_CONFIG.lat, STORE_CONFIG.lng);
+          if (dist > STORE_CONFIG.radiusMeters) {
+            blockUser("未在店內範圍", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場消費才能啟動雷達！`);
+          } else {
+            statusPill.innerText = "等待消費驗證";
+            tipText.innerText = "請輸入結帳單上的抓寶通關碼";
+            authModal.style.display = 'flex';
+          }
+        },
+        (err) => {
+          blockUser("請開啟定位權限", "請允許瀏覽器存取位置資訊，以確認您已在店內！");
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    function verifyReceiptCode() {
+      const input = document.getElementById('passcodeInput').value.trim();
+      if (input === STORE_CONFIG.passcode) {
+        authModal.style.display = 'none';
+        startRadarScan();
+      } else {
+        authError.style.display = 'block';
+      }
+    }
+
+    function blockUser(title, msg) {
+      statusPill.innerText = "探測終止";
+      statusPill.style.background = "#475569";
+      tipText.innerText = "無法啟動雷達";
+      modalTitle.innerText = title;
+      modalTitle.style.color = "#f43f5e";
+      modalDesc.innerHTML = msg;
+      prizeSection.style.display = 'none';
+      closeBtn.innerText = "我知道了";
+      closeBtn.onclick = () => { modal.style.display = 'none'; };
+      modal.style.display = 'flex';
+    }
+
+    function startRadarScan() {
+      scanner.style.display = 'block';
+      statusPill.innerText = "掃描店內訊號中...";
+      statusPill.style.background = "#0284c7";
+      tipText.innerText = "正在感應野生優惠，請屏息以待...";
+
+      const delay = 2000 + Math.random() * 2000;
+      setTimeout(() => {
+        scanner.style.display = 'none';
+        
+        if (Math.random() < 0.15) {
+          blockUser("💨 周圍一片安靜", "雷達掃描了一圈，這時候附近沒有野生優惠出沒。<br><br>稍後或明天再來試試手氣！");
+          return;
+        }
+
+        spawnMonster();
+      }, delay);
+    }
+
+    function spawnMonster() {
+      const rand = Math.random();
+      let acc = 0;
+      for (const m of MONSTER_TYPES) {
+        acc += m.weight;
+        if (rand <= acc) {
+          currentMonster = {
+            ...m,
+            x: 50 + Math.random() * 220,
+            y: 50 + Math.random() * 80,
+            radius: 24,
+            vx: (Math.random() > 0.5 ? 1 : -1) * m.speed,
+            vy: (Math.random() > 0.5 ? 1 : -1) * (m.speed * 0.7),
+            isCaptured: false
+          };
+          break;
+        }
+      }
+
+      isSpawned = true;
+      statusPill.innerText = `⚠️ 發現【${currentMonster.name}】！`;
+      statusPill.style.background = "#e63946";
+      tipText.innerText = "快！向上滑動精靈球丟擲捕捉！";
+    }
+
+    function loop() {
+      if (isSpawned && currentMonster && !currentMonster.isCaptured && !isShaking) {
+        currentMonster.x += currentMonster.vx;
+        currentMonster.y += currentMonster.vy;
+
+        if (currentMonster.x - currentMonster.radius < 15 || currentMonster.x + currentMonster.radius > canvas.width - 15) {
+          currentMonster.vx *= -1;
+        }
+        if (currentMonster.y - currentMonster.radius < 15 || currentMonster.y + currentMonster.radius > 160) {
+          currentMonster.vy *= -1;
+        }
+      }
+
+      if (ball.isThrown && !isShaking) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        if (isSpawned && currentMonster && !currentMonster.isCaptured) {
+          const dist = Math.hypot(ball.x - currentMonster.x, ball.y - currentMonster.y);
+          if (dist < ball.radius + currentMonster.radius) {
+            triggerHit();
+          }
+        }
+
+        if (ball.y < -30 || ball.x < -30 || ball.x > canvas.width + 30) {
+          resetBall();
+        }
+      }
+
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(72, 202, 228, 0.15)";
+      ctx.beginPath();
+      ctx.arc(160, 180, 50, 0, Math.PI * 2);
+      ctx.arc(160, 180, 100, 0, Math.PI * 2);
+      ctx.arc(160, 180, 150, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      if (isSpawned && currentMonster && !currentMonster.isCaptured) {
+        ctx.font = "34px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(currentMonster.emoji, currentMonster.x, currentMonster.y);
+      }
+
+      if (isSpawned) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, Math.PI, 0, false);
+        ctx.fillStyle = "#e63946";
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#fff";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI, false);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "#333";
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (!isSpawned) return;
+      const t = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const tx = t.clientX - rect.left;
+      const ty = t.clientY - rect.top;
+
+      if (!ball.isThrown && Math.hypot(tx - ball.x, ty - ball.y) < 35) {
+        ball.isDragging = true;
+        ball.startX = tx;
+        ball.startY = ty;
+      }
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (ball.isDragging) {
+        const t = e.changedTouches[0];
+        const rect = canvas.getBoundingClientRect();
+        const dy = (t.clientY - rect.top) - ball.startY;
+        const dx = (t.clientX - rect.left) - ball.startX;
+
+        if (dy < -20) {
+          ball.vx = dx * 0.15;
+          ball.vy = dy * 0.22;
+          ball.isThrown = true;
+        }
+        ball.isDragging = false;
+      }
+    });
+
+    function triggerHit() {
+      currentMonster.isCaptured = true;
+      ball.isThrown = false;
+      isShaking = true;
+      shakeCount = 0;
+      tipText.innerText = "命中！正在收服中...";
+
+      const interval = setInterval(() => {
+        shakeCount++;
+        ball.x += (shakeCount % 2 === 0 ? 6 : -6);
+
+        if (shakeCount >= 6) {
+          clearInterval(interval);
+          isShaking = false;
+          showOutcome();
+        }
+      }, 250);
+    }
+
+    function resetBall() {
+      ball.x = 160;
+      ball.y = 310;
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.isThrown = false;
+      tipText.innerText = "沒砸中！快再丟一顆！";
+    }
+
+    function showOutcome() {
+      modalTitle.innerText = currentMonster.prize === "謝謝光臨" ? "💨 掙脫溜走！" : "🎉 成功收服！";
+      modalTitle.style.color = currentMonster.prize === "謝謝光臨" ? "#94a3b8" : "#48cae4";
+      modalDesc.innerHTML = currentMonster.desc;
+
+      if (currentMonster.prize !== "謝謝光臨") {
+        couponText.innerText = currentMonster.prize;
+        prizeSection.style.display = 'block';
+        startTimer();
+      } else {
+        prizeSection.style.display = 'none';
+      }
+      closeBtn.innerText = "離開";
+      closeBtn.onclick = () => { modal.style.display = 'none'; };
+      modal.style.display = 'flex';
+    }
+
+    function startTimer() {
+      let sec = 15 * 60;
+      const el = document.getElementById('timer');
+      const t = setInterval(() => {
+        sec--;
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        el.innerText = `請於 ${m}:${s} 內出示給店員核銷`;
+        if (sec <= 0) { clearInterval(t); el.innerText = "優惠已失效"; }
+      }, 1000);
+    }
+
+    function redeemCoupon() {
+      if (confirm("確認由店員核銷此優惠券？核銷後即失效。")) {
+        alert("核銷成功！已為您折抵！");
+        modal.style.display = 'none';
+      }
+    }
+
+    initLocationCheck();
+    loop();
+  </script>
+</body>
+</html>
