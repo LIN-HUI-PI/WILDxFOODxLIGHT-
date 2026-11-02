@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-  <title>門市限定・野生雷達抓寶</title>
+  <title>門市限定・撒野計劃</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
     body {
@@ -20,7 +20,7 @@
     }
 
     .top-bar { width: 100%; max-width: 320px; text-align: center; }
-    .top-bar h1 { font-size: 1.2rem; color: #48cae4; margin-bottom: 4px; }
+    .top-bar h1 { font-size: 1.25rem; color: #48cae4; margin-bottom: 4px; letter-spacing: 1px; }
     .status-pill {
       display: inline-block;
       font-size: 0.8rem;
@@ -128,7 +128,7 @@
 <body>
 
   <div class="top-bar">
-    <h1>門市野生尋寶雷達</h1>
+    <h1>門市限定・撒野計劃</h1>
     <div class="status-pill" id="statusPill">正在驗證店內位置...</div>
   </div>
 
@@ -143,9 +143,9 @@
   <div class="modal" id="authModal">
     <div class="card">
       <h3 style="color: #38bdf8;">🔒 啟動雷達鎖定</h3>
-      <p>本活動限定<b>店內消費（不限金額）</b>參與。<br>請輸入結帳單上的 4 位數抓寶通關碼：</p>
+      <p>本活動限定<b>店內消費（不限金額）</b>參與。<br>請輸入結帳單上的 4 位數通關碼：</p>
       <input type="number" pattern="[0-9]*" class="code-input" id="passcodeInput" placeholder="••••" maxlength="4">
-      <button class="btn" onclick="verifyReceiptCode()">解鎖雷達開抓</button>
+      <button class="btn" onclick="verifyReceiptCode()">解鎖雷達開始撒野</button>
       <p id="authError" style="color: #fb7185; font-size: 0.8rem; margin-top: 10px; display: none;">通關碼錯誤，請洽櫃檯店員</p>
     </div>
   </div>
@@ -153,7 +153,7 @@
   <!-- 結果 / 阻擋彈窗 -->
   <div class="modal" id="resultModal">
     <div class="card">
-      <h3 id="modalTitle">探測結果</h3>
+      <h3 id="modalTitle">撒野成果</h3>
       <p id="modalDesc"></p>
 
       <!-- 中獎折價券區塊 -->
@@ -171,15 +171,15 @@
 
   <script>
     // ==========================================
-    // ⚙️ 門市參數設定（日後可微調）
+    // ⚙️ 門市參數設定
     // ==========================================
     const STORE_CONFIG = {
-      passcode: "8888",      // 今日消費通關碼（預設 8888，可隨時改）
-      lat: 23.00000,         // 店面緯度（貼上 Google 地圖數字）
-      lng: 120.20000,        // 店面經度（貼上 Google 地圖數字）
-      radiusMeters: 50,      // 限定距離半徑（50 公尺涵蓋店內與門口）
-      openMins: 6 * 60 + 30, // 開放時間 06:30
-      closeMins: 12 * 60     // 結束時間 12:00
+      passcode: "8888",      // 今日消費通關碼（可隨時換）
+      lat: 23.00000,         // 店面緯度（請貼上 Google 地圖數字）
+      lng: 120.20000,        // 店面經度（請貼上 Google 地圖數字）
+      radiusMeters: 50,      // 限定距離半徑 (公尺)
+      openMins: 9 * 60,      // 09:00 開啟
+      closeMins: 11 * 60     // 11:00 結束
     };
 
     const canvas = document.getElementById('gameCanvas');
@@ -196,12 +196,52 @@
     const couponText = document.getElementById('couponText');
     const closeBtn = document.getElementById('closeBtn');
 
-    // 隨機怪獸池
+    // ==========================================
+    // 🍔 自訂怪獸池 (支援去背照片，若無圖片則自動顯示備援 Emoji)
+    // ==========================================
     const MONSTER_TYPES = [
-      { name: "野生綠寶怪", emoji: "🥪", speed: 1.5, prize: "謝謝光臨", desc: "野生優惠溜走了～明天再來試試！", weight: 0.55 },
-      { name: "稀有紫光獸", emoji: "☕", speed: 2.3, prize: "全單 9 折折價券", desc: "恭喜收服！結帳出示畫面可折抵！", weight: 0.35 },
-      { name: "傳說金冠龍", emoji: "👑", speed: 3.5, prize: "50 元現金抵用券", desc: "太狂了！抓到傳說神獸！", weight: 0.10 }
+      { 
+        name: "野生招牌吐司", 
+        imageSrc: "monster_1.png", 
+        fallbackEmoji: "🥪", 
+        size: 56,                  
+        speed: 1.5, 
+        prize: "謝謝光臨", 
+        desc: "野生優惠溜走了～明天再來撒野試手氣！", 
+        weight: 0.55 
+      },
+      { 
+        name: "暴走特調冰美式", 
+        imageSrc: "monster_2.png", 
+        fallbackEmoji: "☕", 
+        size: 52,
+        speed: 2.3, 
+        prize: "全單 9 折折價券", 
+        desc: "恭喜收服！結帳出示此畫面可享折扣！", 
+        weight: 0.35 
+      },
+      { 
+        name: "黃金酥脆可頌王", 
+        imageSrc: "monster_3.png", 
+        fallbackEmoji: "🥐", 
+        size: 60,
+        speed: 3.5, 
+        prize: "50 元現金抵用券", 
+        desc: "太狂了！抓到傳說神級優惠！", 
+        weight: 0.10 
+      }
     ];
+
+    // 預先載入圖片快取
+    const imageCache = {};
+    MONSTER_TYPES.forEach(m => {
+      if (m.imageSrc) {
+        const img = new Image();
+        img.src = m.imageSrc;
+        imageCache[m.imageSrc] = { img: img, loaded: false };
+        img.onload = () => { imageCache[m.imageSrc].loaded = true; };
+      }
+    });
 
     let currentMonster = null;
     let isSpawned = false;
@@ -227,12 +267,12 @@
 
     function initLocationCheck() {
       if (!checkHours()) {
-        blockUser("雷達休眠中", "野生尋寶僅限營業時段 06:30 - 12:00 開啟，明早再來！");
+        blockUser("雷達休眠中", "撒野計劃僅限門市時段 <b>09:00 - 11:00</b> 開啟，歡迎準時來撒野！");
         return;
       }
 
       if (!navigator.geolocation) {
-        blockUser("無法定位", "您的裝置不支援定位，無法啟動店內雷達。");
+        blockUser("無法定位", "您的裝置不支援定位，無法啟動撒野雷達。");
         return;
       }
 
@@ -240,10 +280,10 @@
         (pos) => {
           const dist = getDistance(pos.coords.latitude, pos.coords.longitude, STORE_CONFIG.lat, STORE_CONFIG.lng);
           if (dist > STORE_CONFIG.radiusMeters) {
-            blockUser("未在店內範圍", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場消費才能啟動雷達！`);
+            blockUser("未在店內範圍", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場消費才能啟動撒野雷達！`);
           } else {
             statusPill.innerText = "等待消費驗證";
-            tipText.innerText = "請輸入結帳單上的抓寶通關碼";
+            tipText.innerText = "請輸入結帳單上的 4 位數通關碼";
             authModal.style.display = 'flex';
           }
         },
@@ -279,16 +319,17 @@
 
     function startRadarScan() {
       scanner.style.display = 'block';
-      statusPill.innerText = "掃描店內訊號中...";
+      statusPill.innerText = "雷達感應中...";
       statusPill.style.background = "#0284c7";
-      tipText.innerText = "正在感應野生優惠，請屏息以待...";
+      tipText.innerText = "正在搜尋野生美味，請屏息以待...";
 
       const delay = 2000 + Math.random() * 2000;
       setTimeout(() => {
         scanner.style.display = 'none';
         
+        // 15% 隨機撲空
         if (Math.random() < 0.15) {
-          blockUser("💨 周圍一片安靜", "雷達掃描了一圈，這時候附近沒有野生優惠出沒。<br><br>稍後或明天再來試試手氣！");
+          blockUser("💨 周圍一片安靜", "雷達感應了一圈，這時候周圍沒有野生優惠出沒。<br><br>稍後或明天再來試試手氣！");
           return;
         }
 
@@ -304,9 +345,9 @@
         if (rand <= acc) {
           currentMonster = {
             ...m,
-            x: 50 + Math.random() * 220,
+            x: 60 + Math.random() * 200,
             y: 50 + Math.random() * 80,
-            radius: 24,
+            radius: (m.size || 54) / 2,
             vx: (Math.random() > 0.5 ? 1 : -1) * m.speed,
             vy: (Math.random() > 0.5 ? 1 : -1) * (m.speed * 0.7),
             isCaptured: false
@@ -357,6 +398,7 @@
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // 背景雷達網格
       ctx.save();
       ctx.strokeStyle = "rgba(72, 202, 228, 0.15)";
       ctx.beginPath();
@@ -366,13 +408,29 @@
       ctx.stroke();
       ctx.restore();
 
+      // 繪製野生怪獸
       if (isSpawned && currentMonster && !currentMonster.isCaptured) {
-        ctx.font = "34px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(currentMonster.emoji, currentMonster.x, currentMonster.y);
+        const cached = imageCache[currentMonster.imageSrc];
+        const s = currentMonster.size || 54;
+
+        if (cached && cached.loaded) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(currentMonster.x, currentMonster.y + s/2 - 2, s/2.5, 6, 0, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.fill();
+
+          ctx.drawImage(cached.img, currentMonster.x - s/2, currentMonster.y - s/2, s, s);
+          ctx.restore();
+        } else {
+          ctx.font = `${s * 0.65}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(currentMonster.fallbackEmoji || "🎁", currentMonster.x, currentMonster.y);
+        }
       }
 
+      // 繪製精靈球
       if (isSpawned) {
         ctx.save();
         ctx.beginPath();
@@ -456,7 +514,7 @@
     }
 
     function showOutcome() {
-      modalTitle.innerText = currentMonster.prize === "謝謝光臨" ? "💨 掙脫溜走！" : "🎉 成功收服！";
+      modalTitle.innerText = currentMonster.prize === "謝謝光臨" ? "💨 掙脫溜走！" : "🎉 撒野成功！";
       modalTitle.style.color = currentMonster.prize === "謝謝光臨" ? "#94a3b8" : "#48cae4";
       modalDesc.innerHTML = currentMonster.desc;
 
@@ -467,7 +525,7 @@
       } else {
         prizeSection.style.display = 'none';
       }
-      closeBtn.innerText = "離開";
+      closeBtn.innerText = "完成";
       closeBtn.onclick = () => { modal.style.display = 'none'; };
       modal.style.display = 'flex';
     }
