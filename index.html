@@ -164,29 +164,32 @@
         <button class="btn btn-redeem" onclick="redeemCoupon()">店員專用核銷按鈕</button>
       </div>
 
-      <button class="btn" id="retryBtn" style="display: none;" onclick="initLocationCheck()">重新整理 GPS 定位</button>
+      <button class="btn" id="retryBtn" style="display: none;" onclick="initLocationCheck()">重新抓取位置</button>
       <button class="btn btn-secondary" id="closeBtn" style="margin-top: 8px;" onclick="closeModal()">關閉</button>
     </div>
   </div>
 
   <script>
     // ==========================================
-    // ⚙️ 門市參數設定（野食光精確座標 + 寬容室內飄移半徑）
+    // ⚙️ 門市參數設定（指南針現場實測座標）
     // ==========================================
     const STORE_CONFIG = {
       passcode: "8888",      
-      lat: 23.04870,         // 野食光緯度
-      lng: 120.19830,        // 野食光經度
-      radiusMeters: 200,     // 👈 設定 200 公尺！能精準擋住不在店附近的客人，又能防止店內室內訊號飄移
+      lat: 23.04722,         // 現場實測：北緯 23°2'50"
+      lng: 120.18278,        // 現場實測：東經 120°10'58"
+      radiusMeters: 200      // 200 公尺室內寬容度
     };
 
     const AREA_MONSTERS = {
+      // 1. 門口限定怪獸 (網址帶 ?area=door)
       door: [
         { name: "門口守護獸・1號怪", imageSrc: "monster_1.png", fallbackEmoji: "🥪", size: 56, speed: 1.5, prize: "門市抵用券 20 元", desc: "在門口捕獲 1 號守護獸！結帳出示畫面可折抵！", weight: 1.0 }
       ],
+      // 2. 遊戲區限定怪獸 (網址帶 ?area=play)
       play: [
         { name: "遊戲區霸主・2號怪", imageSrc: "monster_2.png", fallbackEmoji: "☕", size: 54, speed: 2.2, prize: "全單 9 折折價券", desc: "在遊戲區捕獲 2 號霸主！結帳出示畫面可享折扣！", weight: 1.0 }
       ],
+      // 3. 預設怪獸 (一般掃碼)
       default: [
         { name: "野生招牌怪", imageSrc: "monster_1.png", fallbackEmoji: "🥐", size: 56, speed: 1.8, prize: "全單 95 折券", desc: "恭喜收服！結帳出示畫面可折抵！", weight: 1.0 }
       ]
@@ -296,7 +299,7 @@
       scanner.style.display = 'block';
       statusPill.innerText = "雷達感應中...";
       statusPill.style.background = "#0284c7";
-      tipText.innerText = "正在搜尋該區域野生美味，請屏息以待...";
+      tipText.innerText = "正在搜尋野生美味，請屏息以待...";
 
       setTimeout(() => {
         scanner.style.display = 'none';
