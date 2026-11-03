@@ -42,7 +42,21 @@
       box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
     }
 
-    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; }
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; position: absolute; inset: 0; z-index: 2; }
+
+    /* 真實動態怪獸影片層 (圓形懸浮) */
+    #monsterVideo {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: none;
+      z-index: 1;
+      pointer-events: none;
+      box-shadow: 0 0 15px rgba(255,255,255,0.4);
+      border: 2px solid rgba(255,255,255,0.8);
+    }
 
     .radar-scanner {
       position: absolute;
@@ -52,6 +66,7 @@
       animation: scan 2s linear infinite;
       pointer-events: none;
       display: none;
+      z-index: 3;
     }
     @keyframes scan {
       from { transform: rotate(0deg); }
@@ -134,6 +149,7 @@
 
   <div class="radar-wrapper">
     <div class="radar-scanner" id="scanner"></div>
+    <video id="monsterVideo" autoplay loop muted playsinline webkit-playsinline></video>
     <canvas id="gameCanvas" width="320" height="360"></canvas>
   </div>
 
@@ -170,9 +186,6 @@
   </div>
 
   <script>
-    // ==========================================
-    // ⚙️ 門市參數設定
-    // ==========================================
     const STORE_CONFIG = {
       passcode: "8888",
       lat: 23.04722,
@@ -180,16 +193,10 @@
       radiusMeters: 2500
     };
 
-    // ==========================================
-    // 📍 4 大獎項與 MP4 影片動畫綁定
-    // ==========================================
     const CURRENT_MONSTER_POOL = [
       {
         name: "小省守護獸・10元怪",
         videoSrc: "monster_1.png.MP4",
-        fallbackEmoji: "🪙",
-        size: 75,
-        speed: 1.5,
         prize: "折價券 10 元（限本月使用完畢）",
         desc: "收服成功！憑此畫面【結帳總金額直接折抵 10 元】（非打折），請於本月使用完畢喔！",
         weight: 0.50
@@ -197,9 +204,6 @@
       {
         name: "回甘茶仙・紅茶怪",
         videoSrc: "monster_2.png.MP4",
-        fallbackEmoji: "🥤",
-        size: 75,
-        speed: 1.8,
         prize: "不多不少中杯紅茶一杯",
         desc: "捕捉到清涼茶仙！結帳出示畫面，兌換中杯紅茶一杯！",
         weight: 0.25
@@ -207,9 +211,6 @@
       {
         name: "微笑調皮鬼・明日怪",
         videoSrc: "monster_1.png.MP4",
-        fallbackEmoji: "👋",
-        size: 75,
-        speed: 2.2,
         prize: "謝謝光臨，明天要再來喔",
         desc: "哎呀！怪獸溜走了～但野食光永遠歡迎您，明天要再來喔！",
         weight: 0.15
@@ -217,9 +218,6 @@
       {
         name: "飽足堡主・漢堡怪",
         videoSrc: "monster_2.png.MP4",
-        fallbackEmoji: "🍔",
-        size: 75,
-        speed: 2.0,
         prize: "豬肉漢堡堡一顆",
         desc: "太幸運啦！捕獲超人氣飽足怪，送您豬肉漢堡堡一顆！",
         weight: 0.10
@@ -228,6 +226,7 @@
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    const monsterVideo = document.getElementById('monsterVideo');
     const statusPill = document.getElementById('statusPill');
     const tipText = document.getElementById('tipText');
     const scanner = document.getElementById('scanner');
@@ -240,25 +239,6 @@
     const couponText = document.getElementById('couponText');
     const retryBtn = document.getElementById('retryBtn');
     const closeBtn = document.getElementById('closeBtn');
-
-    // 影片快取與預載（支援手機靜音內嵌循環播放）
-    const videoCache = {};
-    function loadVideo(src) {
-      if (!videoCache[src]) {
-        const v = document.createElement('video');
-        v.src = src;
-        v.muted = true;
-        v.loop = true;
-        v.playsInline = true;
-        v.setAttribute('playsinline', '');
-        v.setAttribute('webkit-playsinline', '');
-        v.load();
-        videoCache[src] = { video: v, ready: false };
-        v.addEventListener('canplay', () => { videoCache[src].ready = true; });
-      }
-      return videoCache[src];
-    }
-    CURRENT_MONSTER_POOL.forEach(m => loadVideo(m.videoSrc));
 
     let currentMonster = null;
     let isSpawned = false;
@@ -351,9 +331,9 @@
         if (rand <= acc) {
           currentMonster = {
             ...m,
-            x: 160,
-            y: 75,
-            radius: m.size / 2,
+            x: 120,
+            y: 50,
+            radius: 40,
             vx: (Math.random() > 0.5 ? 1 : -1) * m.speed,
             vy: (Math.random() > 0.5 ? 0.6 : -0.6) * m.speed,
             isCaptured: false
@@ -362,12 +342,10 @@
         }
       }
 
-      // 觸發播放怪獸的 MP4 影片
-      const cached = videoCache[currentMonster.videoSrc];
-      if (cached && cached.video) {
-        cached.video.currentTime = 0;
-        cached.video.play().catch(e => console.log('Autoplay handled:', e));
-      }
+      // 載入並啟動 MP4 影片
+      monsterVideo.src = currentMonster.videoSrc;
+      monsterVideo.style.display = 'block';
+      monsterVideo.play().catch(e => console.log('Autoplay:', e));
 
       ball.x = 160;
       ball.y = 310;
@@ -385,12 +363,16 @@
         currentMonster.x += currentMonster.vx;
         currentMonster.y += currentMonster.vy;
 
-        if (currentMonster.x - currentMonster.radius < 20 || currentMonster.x + currentMonster.radius > canvas.width - 20) {
+        if (currentMonster.x < 10 || currentMonster.x > 230) {
           currentMonster.vx *= -1;
         }
-        if (currentMonster.y - currentMonster.radius < 20 || currentMonster.y + currentMonster.radius > 150) {
+        if (currentMonster.y < 10 || currentMonster.y > 120) {
           currentMonster.vy *= -1;
         }
+
+        // 即時移動 HTML5 影片位置
+        monsterVideo.style.left = currentMonster.x + 'px';
+        monsterVideo.style.top = currentMonster.y + 'px';
       }
 
       if (ball.isThrown && !isShaking) {
@@ -398,8 +380,10 @@
         ball.y += ball.vy;
 
         if (isSpawned && currentMonster && !currentMonster.isCaptured && ball.y < 220) {
-          const dist = Math.hypot(ball.x - currentMonster.x, ball.y - currentMonster.y);
-          if (dist < ball.radius + currentMonster.radius) {
+          const centerX = currentMonster.x + 40;
+          const centerY = currentMonster.y + 40;
+          const dist = Math.hypot(ball.x - centerX, ball.y - centerY);
+          if (dist < ball.radius + 40) {
             triggerHit();
           }
         }
@@ -416,7 +400,7 @@
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 背景雷達同心圓
+      // 背景雷達線條
       ctx.save();
       ctx.strokeStyle = "rgba(72, 202, 228, 0.2)";
       ctx.lineWidth = 1.5;
@@ -427,28 +411,7 @@
       ctx.stroke();
       ctx.restore();
 
-      // 畫會動的 MP4 怪獸
-      if (isSpawned && currentMonster && !currentMonster.isCaptured) {
-        const s = currentMonster.size;
-        const cached = videoCache[currentMonster.videoSrc];
-
-        if (cached && cached.video && cached.video.readyState >= 2) {
-          ctx.save();
-          // 圓形遮罩，讓影片呈現圓滾滾的立體怪獸感
-          ctx.beginPath();
-          ctx.arc(currentMonster.x, currentMonster.y, s/2, 0, Math.PI * 2);
-          ctx.clip();
-          ctx.drawImage(cached.video, currentMonster.x - s/2, currentMonster.y - s/2, s, s);
-          ctx.restore();
-        } else {
-          ctx.font = `${s * 0.7}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(currentMonster.fallbackEmoji, currentMonster.x, currentMonster.y);
-        }
-      }
-
-      // 畫精靈球
+      // 精靈球
       if (isSpawned) {
         ctx.save();
         ctx.beginPath();
@@ -510,10 +473,7 @@
       shakeCount = 0;
       tipText.innerText = "🎯 命中怪獸！正在收服中...";
 
-      const cached = videoCache[currentMonster.videoSrc];
-      if (cached && cached.video) {
-        cached.video.pause();
-      }
+      monsterVideo.style.display = 'none';
 
       const interval = setInterval(() => {
         shakeCount++;
