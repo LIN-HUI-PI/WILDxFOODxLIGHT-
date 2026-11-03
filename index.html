@@ -1,632 +1,525 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>門市限定・撒野計劃</title>
-<style>
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: radial-gradient(circle, #1b263b, #0d1b2a);
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-around;
-  padding: 20px 12px;
-  gap: 14px;
-}
-.top-bar { text-align: center; }
-.top-bar h1 {
-  font-size: 1.3rem;
-  color: #48cae4;
-  margin: 0 0 8px;
-}
-.status-pill {
-  display: inline-block;
-  font-size: .8rem;
-  background: #334155;
-  padding: 6px 12px;
-  border-radius: 30px;
-  color: #90e0ef;
-}
-.radar-wrapper {
-  position: relative;
-  width: min(320px, 94vw);
-  aspect-ratio: 8 / 9;
-  background: radial-gradient(circle, #1e3d59, #17252a 80%);
-  border: 3px solid #48cae4;
-  border-radius: 24px;
-  overflow: hidden;
-  box-shadow: 0 0 25px #48cae433;
-}
-#gameCanvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  touch-action: none;
-  z-index: 2;
-}
-#monsterVideo {
-  position: absolute;
-  width: 25%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  object-fit: cover;
-  display: none;
-  z-index: 1;
-  pointer-events: none;
-  border: 2px solid #fffc;
-  box-shadow: 0 0 15px #fff6;
-}
-.radar-scanner {
-  position: absolute;
-  inset: 0;
-  border-radius: 20px;
-  background: conic-gradient(#48cae455, transparent 60deg);
-  animation: scan 2s linear infinite;
-  pointer-events: none;
-  display: none;
-  z-index: 3;
-}
-@keyframes scan {
-  to { transform: rotate(360deg); }
-}
-.tip-text {
-  font-size: .9rem;
-  color: #cbd5e1;
-  text-align: center;
-}
-.modal {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: #000e;
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.card {
-  background: #1e293b;
-  border: 2px solid #48cae4;
-  border-radius: 20px;
-  padding: 24px;
-  width: 100%;
-  max-width: 340px;
-  text-align: center;
-}
-.card h3 {
-  font-size: 1.35rem;
-  margin: 0 0 10px;
-  color: #48cae4;
-}
-.card p {
-  font-size: .9rem;
-  color: #cbd5e1;
-  line-height: 1.65;
-  margin: 0 0 16px;
-}
-.code-input {
-  width: 180px;
-  font-size: 1.5rem;
-  letter-spacing: 6px;
-  text-align: center;
-  padding: 10px;
-  border: 2px solid #48cae4;
-  border-radius: 12px;
-  background: #0f172a;
-  color: #fff;
-  margin-bottom: 16px;
-}
-.coupon-box {
-  background: #fff;
-  color: #0f172a;
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 16px;
-  border-left: 6px dashed #48cae4;
-}
-.coupon-name {
-  font-size: 1.15rem;
-  font-weight: bold;
-  color: #0284c7;
-}
-.countdown {
-  font-size: .8rem;
-  color: #e11d48;
-  margin-top: 5px;
-  font-weight: bold;
-}
-.btn {
-  background: #48cae4;
-  color: #0b132b;
-  border: 0;
-  font-weight: bold;
-  padding: 13px 20px;
-  border-radius: 25px;
-  width: 100%;
-  font-size: .95rem;
-  cursor: pointer;
-}
-.btn-redeem {
-  background: #e11d48;
-  color: #fff;
-  margin-top: 8px;
-}
-.btn-secondary {
-  background: #475569;
-  color: #fff;
-  margin-top: 8px;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>門市限定・撒野計劃</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      background: radial-gradient(circle at center, #1b263b 0%, #0d1b2a 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 100vh;
+      overflow: hidden;
+      padding: 24px 16px;
+    }
+
+    .top-bar { width: 100%; max-width: 320px; text-align: center; }
+    .top-bar h1 { font-size: 1.25rem; color: #48cae4; margin-bottom: 4px; letter-spacing: 1px; }
+    .status-pill {
+      display: inline-block;
+      font-size: 0.8rem;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 12px;
+      border-radius: 20px;
+      color: #90e0ef;
+    }
+
+    /* 雷達視窗 */
+    .radar-wrapper {
+      position: relative;
+      width: 320px;
+      height: 360px;
+      background: radial-gradient(circle, #1e3d59 0%, #17252a 80%);
+      border: 3px solid #48cae4;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
+    }
+
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; position: absolute; inset: 0; z-index: 2; }
+
+    /* 怪獸影片浮動視窗 (圓形懸浮) */
+    #monsterVideo {
+      position: absolute;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: none;
+      z-index: 3;
+      pointer-events: none;
+      box-shadow: 0 0 16px rgba(255,255,255,0.6);
+      border: 2px solid #ffffff;
+      left: 120px;
+      top: 50px;
+    }
+
+    .radar-scanner {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: conic-gradient(from 0deg, rgba(72, 202, 228, 0.35) 0deg, transparent 60deg);
+      animation: scan 2s linear infinite;
+      pointer-events: none;
+      display: none;
+      z-index: 1;
+    }
+    @keyframes scan {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .tip-text { font-size: 0.85rem; color: #adb5bd; margin-bottom: 8px; text-align: center; }
+
+    /* 彈窗樣式 */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border: 2px solid #48cae4;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+    }
+    .card h3 { font-size: 1.35rem; margin-bottom: 8px; }
+    .card p { font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 16px; }
+
+    .code-input {
+      width: 180px;
+      font-size: 1.5rem;
+      letter-spacing: 6px;
+      text-align: center;
+      padding: 8px 12px;
+      border: 2px solid #48cae4;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #fff;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    
+    .coupon-box {
+      background: #fff;
+      color: #0f172a;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+      border-left: 6px dashed #48cae4;
+      text-align: center;
+    }
+    .coupon-name { font-size: 1.15rem; font-weight: bold; color: #0284c7; }
+    .countdown { font-size: 0.75rem; color: #e11d48; margin-top: 4px; font-weight: bold; }
+
+    .btn {
+      background: #48cae4;
+      color: #0b132b;
+      border: none;
+      font-weight: bold;
+      padding: 12px 24px;
+      border-radius: 25px;
+      width: 100%;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .btn-redeem { background: #e11d48; color: #fff; margin-top: 8px; }
+    .btn-secondary { background: #475569; color: #fff; margin-top: 8px; }
+  </style>
 </head>
 <body>
 
-<div class="top-bar">
-  <h1>門市限定・撒野計劃</h1>
-  <div class="status-pill" id="statusPill">
-    📡 正在連接 GPS 雷達...
+  <div class="top-bar">
+    <h1>門市限定・撒野計劃</h1>
+    <div class="status-pill" id="statusPill">📡 正在連接 GPS 雷達...</div>
   </div>
-</div>
 
-<div class="radar-wrapper">
-  <div class="radar-scanner" id="scanner"></div>
-  <video id="monsterVideo"
-    autoplay loop muted playsinline webkit-playsinline>
-  </video>
-  <canvas id="gameCanvas" width="320" height="360"></canvas>
-</div>
-
-<div class="tip-text" id="tipText">
-  雷達定位中，請允許位置存取...
-</div>
-
-<div class="modal" id="authModal">
-  <div class="card">
-    <h3>🔒 啟動雷達鎖定</h3>
-    <p>
-      本活動限定<b>店內消費</b>參與。<br>
-      請輸入結帳單上的 4 位數通關碼：
-    </p>
-    <input type="text"
-      inputmode="numeric"
-      autocomplete="off"
-      maxlength="4"
-      class="code-input"
-      id="passcodeInput"
-      placeholder="••••">
-    <button class="btn" id="authBtn">
-      解鎖雷達開始撒野
-    </button>
-    <p id="authError"
-      style="color:#fb7185;display:none;margin-top:12px">
-      通關碼錯誤，請洽櫃檯店員
-    </p>
+  <div class="radar-wrapper">
+    <div class="radar-scanner" id="scanner"></div>
+    <video id="monsterVideo" autoplay loop muted playsinline webkit-playsinline></video>
+    <canvas id="gameCanvas" width="320" height="360"></canvas>
   </div>
-</div>
 
-<div class="modal" id="resultModal">
-  <div class="card">
-    <h3 id="modalTitle">🎉 撒野成果！</h3>
-    <p id="modalDesc"></p>
+  <div class="tip-text" id="tipText">雷達定位中，請允許位置存取...</div>
 
-    <div id="prizeSection" style="display:none">
-      <div class="coupon-box">
-        <div class="coupon-name" id="couponText"></div>
-        <div class="countdown" id="timer"></div>
-      </div>
-      <button class="btn btn-redeem" id="redeemBtn">
-        店員專用核銷按鈕
-      </button>
+  <!-- 消費驗證彈窗 -->
+  <div class="modal" id="authModal">
+    <div class="card">
+      <h3 style="color: #38bdf8;">🔒 啟動雷達鎖定</h3>
+      <p>本活動限定<b>店內消費</b>參與。<br>請輸入結帳單上的 4 位數通關碼：</p>
+      <input type="number" pattern="[0-9]*" class="code-input" id="passcodeInput" placeholder="••••" maxlength="4">
+      <button class="btn" onclick="verifyReceiptCode()">解鎖雷達開始撒野</button>
+      <p id="authError" style="color: #fb7185; font-size: 0.8rem; margin-top: 10px; display: none;">通關碼錯誤，請洽櫃檯店員</p>
     </div>
-
-    <button class="btn" id="retryBtn" style="display:none">
-      重新抓取位置
-    </button>
-    <button class="btn btn-secondary" id="closeBtn">
-      關閉
-    </button>
   </div>
-</div>
 
-<script>
-'use strict';
+  <!-- 提示 / 結果彈窗 -->
+  <div class="modal" id="resultModal">
+    <div class="card">
+      <h3 id="modalTitle">🎉 撒野成果！</h3>
+      <p id="modalDesc"></p>
 
-const STORE_CONFIG = {
-  passcode: '8888',
-  lat: 23.04722,
-  lng: 120.18278,
-  radiusMeters: 2500
-};
+      <div id="prizeSection" style="display: none;">
+        <div class="coupon-box">
+          <div class="coupon-name" id="couponText">折價券 10 元（限本月使用完畢）</div>
+          <div class="countdown" id="timer">請於 15:00 內出示給店員核銷</div>
+        </div>
+        <button class="btn btn-redeem" onclick="redeemCoupon()">店員專用核銷按鈕</button>
+      </div>
 
-const CURRENT_MONSTER_POOL = [
-  {
-    name: '小省守護獸・10元怪',
-    videoSrc: 'monster_1.png.MP4',
-    prize: '折價券 10 元（限本月使用完畢）',
-    desc: '收服成功！憑此畫面【結帳總金額直接折抵 10 元】（非打折），請於本月使用完畢喔！',
-    weight: 0.50
-  },
-  {
-    name: '回甘茶仙・紅茶怪',
-    videoSrc: 'monster_2.png.MP4',
-    prize: '不多不少中杯紅茶一杯',
-    desc: '捕捉到清涼茶仙！結帳出示畫面，兌換中杯紅茶一杯！',
-    weight: 0.25
-  },
-  {
-    name: '微笑調皮鬼・明日怪',
-    videoSrc: 'monster_1.png.MP4',
-    prize: '謝謝光臨，明天要再來喔',
-    desc: '哎呀！怪獸溜走了～但野食光永遠歡迎您，明天要再來喔！',
-    weight: 0.15
-  },
-  {
-    name: '飽足堡主・漢堡怪',
-    videoSrc: 'monster_2.png.MP4',
-    prize: '豬肉漢堡堡一顆',
-    desc: '太幸運啦！捕獲超人氣飽足怪，送您豬肉漢堡堡一顆！',
-    weight: 0.10
-  }
-];
+      <button class="btn" id="retryBtn" style="display: none;" onclick="initLocationCheck()">重新抓取位置</button>
+      <button class="btn btn-secondary" id="closeBtn" style="margin-top: 8px;" onclick="closeModal()">關閉</button>
+    </div>
+  </div>
 
-const $ = id => document.getElementById(id);
-const canvas = $('gameCanvas');
-const ctx = canvas.getContext('2d');
-const video = $('monsterVideo');
+  <script>
+    const STORE_CONFIG = {
+      passcode: "8888",
+      lat: 23.04722,
+      lng: 120.18278,
+      radiusMeters: 2500
+    };
 
-let monster = null;
-let spawned = false;
-let shaking = false;
-let used = false;
-let expiry = 0;
-let timerHandle = null;
-
-// 撒野小手手
-const hand = {
-  x: 160,
-  y: 310,
-  radius: 22,
-  vx: 0,
-  vy: 0,
-  thrown: false,
-  dragging: false,
-  startX: 0,
-  startY: 0
-};
-
-function distance(a, b, c, d) {
-  const R = 6371000;
-  const p = Math.PI / 180;
-  const x = (c - a) * p;
-  const y = (d - b) * p;
-  const h = Math.sin(x / 2) ** 2 +
-    Math.cos(a * p) * Math.cos(c * p) *
-    Math.sin(y / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-
-function promptBox(title, msg, retry = false) {
-  $('modalTitle').textContent = title;
-  $('modalDesc').textContent = msg;
-  $('prizeSection').style.display = 'none';
-  $('retryBtn').style.display = retry ? 'block' : 'none';
-  $('closeBtn').textContent = '我知道了';
-  $('resultModal').style.display = 'flex';
-}
-
-function locationCheck() {
-  if (used) {
-    return promptBox('本次已完成', '本次遊戲已結束。');
-  }
-
-  $('resultModal').style.display = 'none';
-  $('statusPill').textContent = '📡 正在確認店內位置...';
-
-  if (!navigator.geolocation) {
-    return promptBox('裝置不支援', '此裝置無法使用定位功能。');
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const d = distance(
-        pos.coords.latitude,
-        pos.coords.longitude,
-        STORE_CONFIG.lat,
-        STORE_CONFIG.lng
-      );
-
-      if (d > STORE_CONFIG.radiusMeters) {
-        $('statusPill').textContent = '未在門市範圍';
-        promptBox(
-          '未在門市範圍內',
-          `目前距離門市約 ${Math.round(d)} 公尺。請到門市參加活動。`,
-          true
-        );
-      } else {
-        $('statusPill').textContent = '📍 已進入活動範圍';
-        $('statusPill').style.background = '#059669';
-        $('tipText').textContent = '請輸入結帳單上的 4 位數通關碼';
-        $('authModal').style.display = 'flex';
+    const CURRENT_MONSTER_POOL = [
+      {
+        name: "小省守護獸・10元怪",
+        videoSrc: "monster_1.png.MP4",
+        prize: "折價券 10 元（限本月使用完畢）",
+        desc: "收服成功！憑此畫面【結帳總金額直接折抵 10 元】（非打折），請於本月使用完畢喔！",
+        weight: 0.50
+      },
+      {
+        name: "回甘茶仙・紅茶怪",
+        videoSrc: "monster_2.png.MP4",
+        prize: "不多不少中杯紅茶一杯",
+        desc: "捕捉到清涼茶仙！結帳出示畫面，兌換中杯紅茶一杯！",
+        weight: 0.25
+      },
+      {
+        name: "微笑調皮鬼・明日怪",
+        videoSrc: "monster_1.png.MP4",
+        prize: "謝謝光臨，明天要再來喔",
+        desc: "哎呀！怪獸溜走了～但野食光永遠歡迎您，明天要再來喔！",
+        weight: 0.15
+      },
+      {
+        name: "飽足堡主・漢堡怪",
+        videoSrc: "monster_2.png.MP4",
+        prize: "豬肉漢堡堡一顆",
+        desc: "太幸運啦！捕獲超人氣飽足怪，送您豬肉漢堡堡一顆！",
+        weight: 0.10
       }
-    },
-    () => {
-      $('statusPill').textContent = '定位中斷';
-      promptBox(
-        '請允許 GPS 定位',
-        '請在瀏覽器允許定位後重新嘗試。',
-        true
+    ];
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const monsterVideo = document.getElementById('monsterVideo');
+    const statusPill = document.getElementById('statusPill');
+    const tipText = document.getElementById('tipText');
+    const scanner = document.getElementById('scanner');
+    const authModal = document.getElementById('authModal');
+    const authError = document.getElementById('authError');
+    const modal = document.getElementById('resultModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDesc = document.getElementById('modalDesc');
+    const prizeSection = document.getElementById('prizeSection');
+    const couponText = document.getElementById('couponText');
+    const retryBtn = document.getElementById('retryBtn');
+    const closeBtn = document.getElementById('closeBtn');
+
+    let currentMonster = null;
+    let isSpawned = false;
+    let ball = { x: 160, y: 310, radius: 26, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
+    let isShaking = false;
+    let shakeCount = 0;
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function initLocationCheck() {
+      modal.style.display = 'none';
+      retryBtn.style.display = 'none';
+      statusPill.innerText = "📡 正在確認店內位置...";
+
+      if (!navigator.geolocation) {
+        showPrompt("裝置不支援", "您的裝置未開放定位權限。");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const dist = getDistance(pos.coords.latitude, pos.coords.longitude, STORE_CONFIG.lat, STORE_CONFIG.lng);
+          if (dist > STORE_CONFIG.radiusMeters) {
+            statusPill.innerText = "未在店內";
+            showPrompt("未在門市範圍內", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場才能啟動撒野雷達！`, true);
+          } else {
+            statusPill.innerText = "📍 已鎖定店內雷達";
+            statusPill.style.background = "#059669";
+            tipText.innerText = "請輸入結帳單上的 4 位數通關碼";
+            authModal.style.display = 'flex';
+          }
+        },
+        (err) => {
+          statusPill.innerText = "定位中斷";
+          showPrompt("請允許 GPS 定位", "雷達需要確認您在店內現場，請在跳出的提示點擊「允許」。", true);
+        },
+        { enableHighAccuracy: true, timeout: 7000 }
       );
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 7000,
-      maximumAge: 0
-    }
-  );
-}
-
-function verifyCode() {
-  if ($('passcodeInput').value.trim() !== STORE_CONFIG.passcode) {
-    $('authError').style.display = 'block';
-    return;
-  }
-
-  $('authModal').style.display = 'none';
-  $('scanner').style.display = 'block';
-  $('statusPill').textContent = '雷達感應中...';
-  $('tipText').textContent = '正在搜尋野生美味...';
-
-  setTimeout(() => {
-    $('scanner').style.display = 'none';
-    spawn();
-  }, 2000);
-}
-
-function spawn() {
-  let r = Math.random();
-  let sum = 0;
-  let chosen = CURRENT_MONSTER_POOL[CURRENT_MONSTER_POOL.length - 1];
-
-  for (const m of CURRENT_MONSTER_POOL) {
-    sum += m.weight;
-    if (r < sum) {
-      chosen = m;
-      break;
-    }
-  }
-
-  const speed = chosen.speed ?? 1.2;
-
-  monster = {
-    ...chosen,
-    x: 120,
-    y: 50,
-    vx: (Math.random() > .5 ? 1 : -1) * speed,
-    vy: (Math.random() > .5 ? .6 : -.6) * speed,
-    captured: false
-  };
-
-  video.src = monster.videoSrc;
-  video.style.display = 'block';
-  video.play().catch(() => {});
-
-  resetHand();
-  spawned = true;
-
-  $('statusPill').textContent = `⚠️ 發現【${monster.name}】！`;
-  $('statusPill').style.background = '#e63946';
-  $('tipText').textContent =
-    '按住下方小手手 🖐️，向上滑動抓怪獸！';
-}
-
-function resetHand() {
-  hand.x = 160;
-  hand.y = 310;
-  hand.vx = 0;
-  hand.vy = 0;
-  hand.thrown = false;
-  hand.dragging = false;
-}
-
-function hit() {
-  monster.captured = true;
-  hand.thrown = false;
-  shaking = true;
-  video.style.display = 'none';
-  $('tipText').textContent = '🎯 小手手抓到怪獸了！';
-
-  let n = 0;
-  const id = setInterval(() => {
-    n++;
-    hand.x += (n % 2 ? -6 : 6);
-
-    if (n >= 6) {
-      clearInterval(id);
-      shaking = false;
-      outcome();
-    }
-  }, 250);
-}
-
-function outcome() {
-  used = true;
-  $('modalTitle').textContent = '🎉 撒野成果！';
-  $('modalDesc').textContent = monster.desc;
-  $('couponText').textContent = monster.prize;
-  $('prizeSection').style.display = 'block';
-  $('redeemBtn').disabled = false;
-  $('redeemBtn').textContent = '店員專用核銷按鈕';
-  $('retryBtn').style.display = 'none';
-  $('closeBtn').textContent = '完成';
-
-  expiry = Date.now() + 15 * 60 * 1000;
-  clearInterval(timerHandle);
-  updateTimer();
-  timerHandle = setInterval(updateTimer, 1000);
-
-  $('resultModal').style.display = 'flex';
-}
-
-function updateTimer() {
-  const remaining = Math.max(
-    0,
-    Math.ceil((expiry - Date.now()) / 1000)
-  );
-
-  $('timer').textContent = remaining
-    ? `請於 ${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')} 內出示給店員核銷`
-    : '優惠已失效';
-
-  if (!remaining) {
-    clearInterval(timerHandle);
-    $('redeemBtn').disabled = true;
-    $('redeemBtn').textContent = '已逾核銷時間';
-  }
-}
-
-function redeem() {
-  if (Date.now() >= expiry) return updateTimer();
-
-  if (confirm('請由店員操作：確認核銷此優惠券？')) {
-    clearInterval(timerHandle);
-    $('redeemBtn').disabled = true;
-    $('redeemBtn').textContent = '已核銷';
-    $('timer').textContent = '此優惠已核銷';
-    alert('核銷完成！');
-  }
-}
-
-// 畫出雷達與小手手
-function render() {
-  ctx.clearRect(0, 0, 320, 360);
-
-  ctx.strokeStyle = 'rgba(72,202,228,.2)';
-  ctx.lineWidth = 1.5;
-
-  for (const r of [50, 100, 150]) {
-    ctx.beginPath();
-    ctx.arc(160, 180, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  if (spawned) {
-    ctx.save();
-    ctx.font = '43px "Apple Color Emoji","Segoe UI Emoji",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(72,202,228,.8)';
-    ctx.shadowBlur = 14;
-    ctx.fillText('🖐️', hand.x, hand.y);
-    ctx.restore();
-  }
-}
-
-function loop() {
-  if (spawned && monster && !monster.captured && !shaking) {
-    monster.x += monster.vx;
-    monster.y += monster.vy;
-
-    if (monster.x < 10 || monster.x > 230) {
-      monster.vx *= -1;
-    }
-    if (monster.y < 10 || monster.y > 120) {
-      monster.vy *= -1;
     }
 
-    video.style.left = `${monster.x / 320 * 100}%`;
-    video.style.top = `${monster.y / 360 * 100}%`;
-  }
-
-  if (hand.thrown && !shaking) {
-    hand.x += hand.vx;
-    hand.y += hand.vy;
-
-    if (
-      spawned &&
-      monster &&
-      !monster.captured &&
-      hand.y < 220 &&
-      Math.hypot(
-        hand.x - (monster.x + 40),
-        hand.y - (monster.y + 40)
-      ) < hand.radius + 40
-    ) {
-      hit();
-    } else if (
-      hand.y < -30 ||
-      hand.x < -30 ||
-      hand.x > 350
-    ) {
-      resetHand();
-      $('tipText').textContent = '沒抓到！再滑一次小手手！';
+    function showPrompt(title, msg, showRetry = false) {
+      modalTitle.innerText = title;
+      modalTitle.style.color = "#f43f5e";
+      modalDesc.innerHTML = msg;
+      prizeSection.style.display = 'none';
+      retryBtn.style.display = showRetry ? 'block' : 'none';
+      closeBtn.innerText = "我知道了";
+      modal.style.display = 'flex';
     }
-  }
 
-  render();
-  requestAnimationFrame(loop);
-}
+    function closeModal() {
+      modal.style.display = 'none';
+    }
 
-// 將手機觸控座標換算成遊戲座標
-function point(e) {
-  const rect = canvas.getBoundingClientRect();
+    function verifyReceiptCode() {
+      const input = document.getElementById('passcodeInput').value.trim();
+      if (input === STORE_CONFIG.passcode) {
+        authModal.style.display = 'none';
+        startRadarScan();
+      } else {
+        authError.style.display = 'block';
+      }
+    }
 
-  return {
-    x: (e.clientX - rect.left) * 320 / rect.width,
-    y: (e.clientY - rect.top) * 360 / rect.height
-  };
-}
+    function startRadarScan() {
+      scanner.style.display = 'block';
+      statusPill.innerText = "雷達感應中...";
+      statusPill.style.background = "#0284c7";
+      tipText.innerText = "正在搜尋野生美味，請屏息以待...";
 
-// 按住小手手
-canvas.addEventListener('pointerdown', e => {
-  if (!spawned || hand.thrown || shaking || used) return;
+      setTimeout(() => {
+        scanner.style.display = 'none';
+        spawnMonster();
+      }, 2000);
+    }
 
-  const p = point(e);
+    function spawnMonster() {
+      const rand = Math.random();
+      let acc = 0;
+      for (const m of CURRENT_MONSTER_POOL) {
+        acc += m.weight;
+        if (rand <= acc) {
+          currentMonster = {
+            ...m,
+            x: 118,
+            y: 40,
+            radius: 42,
+            vx: (Math.random() > 0.5 ? 1.2 : -1.2),
+            vy: (Math.random() > 0.5 ? 0.7 : -0.7),
+            isCaptured: false
+          };
+          break;
+        }
+      }
 
-  if (Math.hypot(p.x - hand.x, p.y - hand.y) < 48) {
-    hand.dragging = true;
-    hand.startX = p.x;
-    hand.startY = p.y;
-    canvas.setPointerCapture(e.pointerId);
-  }
-});
+      // 載入並強制播放 MP4 影片浮層
+      monsterVideo.src = currentMonster.videoSrc + "?v=" + new Date().getTime();
+      monsterVideo.style.display = 'block';
+      monsterVideo.style.left = currentMonster.x + 'px';
+      monsterVideo.style.top = currentMonster.y + 'px';
+      monsterVideo.play().catch(e => console.log('Autoplay handled:', e));
 
-// 向上滑動，丟出小手手
-canvas.addEventListener('pointerup', e => {
-  if (!hand.dragging) return;
+      ball.x = 160;
+      ball.y = 310;
+      ball.isThrown = false;
+      ball.isDragging = false;
+      isSpawned = true;
 
-  const p = point(e);
-  const dx = p.x - hand.startX;
-  const dy = p.y - hand.startY;
+      statusPill.innerText = `⚠️ 發現【${currentMonster.name}】！`;
+      statusPill.style.background = "#e63946";
+      tipText.innerText = "按住下方小手手 🖐️，向上滑動去抓！";
+    }
 
-  if (dy < -20) {
-    hand.vx = dx * .15;
-    hand.vy = dy * .22;
-    hand.thrown = true;
-  }
+    function loop() {
+      if (isSpawned && currentMonster && !currentMonster.isCaptured && !isShaking) {
+        currentMonster.x += currentMonster.vx;
+        currentMonster.y += currentMonster.vy;
 
-  hand.dragging = false;
-});
+        if (currentMonster.x < 15 || currentMonster.x > 220) {
+          currentMonster.vx *= -1;
+        }
+        if (currentMonster.y < 15 || currentMonster.y > 130) {
+          currentMonster.vy *= -1;
+        }
 
-canvas.addEventListener('pointercancel', () => {
-  hand.dragging = false;
-});
+        // 同步更新影片在畫面上的實體位置
+        monsterVideo.style.left = currentMonster.x + 'px';
+        monsterVideo.style.top = currentMonster.y + 'px';
+      }
 
-$('authBtn').addEventListener('click', verifyCode);
-$('retryBtn').addEventListener('click', locationCheck);
-$('closeBtn').addEventListener('click', () => {
-  $('resultModal').style.display = 'none';
-});
-$('redeemBtn').addEventListener('click', redeem);
+      if (ball.isThrown && !isShaking) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
 
-locationCheck();
-loop();
-</script>
+        if (isSpawned && currentMonster && !currentMonster.isCaptured && ball.y < 220) {
+          const centerX = currentMonster.x + 42;
+          const centerY = currentMonster.y + 42;
+          const dist = Math.hypot(ball.x - centerX, ball.y - centerY);
+          if (dist < ball.radius + 42) {
+            triggerHit();
+          }
+        }
+
+        if (ball.y < -30 || ball.x < -30 || ball.x > canvas.width + 30) {
+          resetBall();
+        }
+      }
+
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 背景雷達線
+      ctx.save();
+      ctx.strokeStyle = "rgba(72, 202, 228, 0.2)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(160, 180, 50, 0, Math.PI * 2);
+      ctx.arc(160, 180, 100, 0, Math.PI * 2);
+      ctx.arc(160, 180, 150, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // 小手手 (張開 🖐️ / 抓取 ✊)
+      if (isSpawned) {
+        ctx.save();
+        ctx.font = "46px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const handEmoji = ball.isThrown ? "✊" : "🖐️";
+        ctx.fillText(handEmoji, ball.x, ball.y);
+        ctx.restore();
+      }
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (!isSpawned || ball.isThrown || isShaking) return;
+      const t = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const tx = t.clientX - rect.left;
+      const ty = t.clientY - rect.top;
+
+      if (Math.hypot(tx - ball.x, ty - ball.y) < 45) {
+        ball.isDragging = true;
+        ball.startX = tx;
+        ball.startY = ty;
+      }
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (ball.isDragging) {
+        const t = e.changedTouches[0];
+        const rect = canvas.getBoundingClientRect();
+        const dy = (t.clientY - rect.top) - ball.startY;
+        const dx = (t.clientX - rect.left) - ball.startX;
+
+        if (dy < -20) {
+          ball.vx = dx * 0.15;
+          ball.vy = dy * 0.22;
+          ball.isThrown = true;
+        }
+        ball.isDragging = false;
+      }
+    });
+
+    function triggerHit() {
+      currentMonster.isCaptured = true;
+      ball.isThrown = false;
+      isShaking = true;
+      shakeCount = 0;
+      tipText.innerText = "🎯 抓到了！拉回中...";
+
+      monsterVideo.style.display = 'none';
+
+      const interval = setInterval(() => {
+        shakeCount++;
+        ball.x += (shakeCount % 2 === 0 ? 6 : -6);
+
+        if (shakeCount >= 6) {
+          clearInterval(interval);
+          isShaking = false;
+          showOutcome();
+        }
+      }, 250);
+    }
+
+    function resetBall() {
+      ball.x = 160;
+      ball.y = 310;
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.isThrown = false;
+      tipText.innerText = "沒抓到！快再試一次！";
+    }
+
+    function showOutcome() {
+      modalTitle.innerText = "🎉 撒野成果！";
+      modalTitle.style.color = "#48cae4";
+      modalDesc.innerHTML = currentMonster.desc;
+      couponText.innerText = currentMonster.prize;
+      prizeSection.style.display = 'block';
+      retryBtn.style.display = 'none';
+      closeBtn.innerText = "完成";
+      startTimer();
+      modal.style.display = 'flex';
+    }
+
+    function startTimer() {
+      let sec = 15 * 60;
+      const el = document.getElementById('timer');
+      const t = setInterval(() => {
+        sec--;
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        el.innerText = `請於 ${m}:${s} 內出示給店員核銷`;
+        if (sec <= 0) { clearInterval(t); el.innerText = "優惠已失效"; }
+      }, 1000);
+    }
+
+    function redeemCoupon() {
+      if (confirm("確認由店員核銷此優惠券？核銷後即失效。")) {
+        alert("核銷成功！已為您折抵！");
+        modal.style.display = 'none';
+      }
+    }
+
+    initLocationCheck();
+    loop();
+  </script>
 </body>
 </html>
