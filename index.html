@@ -171,33 +171,40 @@
 
   <script>
     // ==========================================
-    // ⚙️ 門市參數設定（指南針現場實測座標）
+    // ⚙️ 門市參數設定（指南針現場實測座標 + 2500公尺寬容度）
     // ==========================================
     const STORE_CONFIG = {
-      passcode: "8888",      
+      passcode: "8888",      // 通關碼
       lat: 23.04722,         // 現場實測：北緯 23°2'50"
       lng: 120.18278,        // 現場實測：東經 120°10'58"
-      radiusMeters: 200      // 200 公尺室內寬容度
+      radiusMeters: 2500     // 容許半徑 2500 公尺（完全解決室內偏差）
     };
 
-    const AREA_MONSTERS = {
-      // 1. 門口限定怪獸 (網址帶 ?area=door)
-      door: [
-        { name: "門口守護獸・1號怪", imageSrc: "monster_1.png", fallbackEmoji: "🥪", size: 56, speed: 1.5, prize: "門市抵用券 20 元", desc: "在門口捕獲 1 號守護獸！結帳出示畫面可折抵！", weight: 1.0 }
-      ],
-      // 2. 遊戲區限定怪獸 (網址帶 ?area=play)
-      play: [
-        { name: "遊戲區霸主・2號怪", imageSrc: "monster_2.png", fallbackEmoji: "☕", size: 54, speed: 2.2, prize: "全單 9 折折價券", desc: "在遊戲區捕獲 2 號霸主！結帳出示畫面可享折扣！", weight: 1.0 }
-      ],
-      // 3. 預設怪獸 (一般掃碼)
-      default: [
-        { name: "野生招牌怪", imageSrc: "monster_1.png", fallbackEmoji: "🥐", size: 56, speed: 1.8, prize: "全單 95 折券", desc: "恭喜收服！結帳出示畫面可折抵！", weight: 1.0 }
-      ]
-    };
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentAreaKey = urlParams.get('area') || 'default';
-    const CURRENT_MONSTER_POOL = AREA_MONSTERS[currentAreaKey] || AREA_MONSTERS['default'];
+    // ==========================================
+    // 📍 單一網址怪獸庫（隨機各 50% 機率登場）
+    // ==========================================
+    const CURRENT_MONSTER_POOL = [
+      {
+        name: "門口守護獸・1號怪",
+        imageSrc: "monster_1.png",
+        fallbackEmoji: "🥪",
+        size: 56,
+        speed: 1.5,
+        prize: "門市抵用券 20 元",
+        desc: "恭喜捕獲 1 號守護獸！結帳可折抵 20 元！",
+        weight: 0.5
+      },
+      {
+        name: "遊戲區霸主・2號怪",
+        imageSrc: "monster_2.png",
+        fallbackEmoji: "☕",
+        size: 54,
+        speed: 2.2,
+        prize: "全單 9 折折價券",
+        desc: "恭喜捕獲 2 號霸主！整單享 9 折優惠！",
+        weight: 0.5
+      }
+    ];
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -214,8 +221,9 @@
     const retryBtn = document.getElementById('retryBtn');
     const closeBtn = document.getElementById('closeBtn');
 
+    // 預載圖片
     const imageCache = {};
-    Object.values(AREA_MONSTERS).flat().forEach(m => {
+    CURRENT_MONSTER_POOL.forEach(m => {
       if (m.imageSrc && !imageCache[m.imageSrc]) {
         const img = new Image();
         img.src = m.imageSrc;
