@@ -84,7 +84,6 @@
     .card h3 { font-size: 1.35rem; margin-bottom: 8px; }
     .card p { font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 16px; }
 
-    /* 消費驗證輸入框 */
     .code-input {
       width: 180px;
       font-size: 1.5rem;
@@ -123,13 +122,14 @@
       font-size: 0.95rem;
     }
     .btn-redeem { background: #e11d48; color: #fff; margin-top: 8px; }
+    .btn-secondary { background: #475569; color: #fff; margin-top: 8px; }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
     <h1>門市限定・撒野計劃</h1>
-    <div class="status-pill" id="statusPill">正在驗證店內位置...</div>
+    <div class="status-pill" id="statusPill">📡 正在連接 GPS 雷達...</div>
   </div>
 
   <div class="radar-wrapper">
@@ -137,26 +137,25 @@
     <canvas id="gameCanvas" width="320" height="360"></canvas>
   </div>
 
-  <div class="tip-text" id="tipText">雷達定位中，請允許手機定位權限...</div>
+  <div class="tip-text" id="tipText">雷達定位中，請允許位置存取...</div>
 
   <!-- 消費驗證彈窗 -->
   <div class="modal" id="authModal">
     <div class="card">
       <h3 style="color: #38bdf8;">🔒 啟動雷達鎖定</h3>
-      <p>本活動限定<b>店內消費（不限金額）</b>參與。<br>請輸入結帳單上的 4 位數通關碼：</p>
+      <p>本活動限定<b>店內消費</b>參與。<br>請輸入結帳單上的 4 位數通關碼：</p>
       <input type="number" pattern="[0-9]*" class="code-input" id="passcodeInput" placeholder="••••" maxlength="4">
       <button class="btn" onclick="verifyReceiptCode()">解鎖雷達開始撒野</button>
       <p id="authError" style="color: #fb7185; font-size: 0.8rem; margin-top: 10px; display: none;">通關碼錯誤，請洽櫃檯店員</p>
     </div>
   </div>
 
-  <!-- 結果 / 阻擋彈窗 -->
+  <!-- 提示 / 結果彈窗 -->
   <div class="modal" id="resultModal">
     <div class="card">
-      <h3 id="modalTitle">撒野成果</h3>
+      <h3 id="modalTitle">提示</h3>
       <p id="modalDesc"></p>
 
-      <!-- 中獎折價券區塊 -->
       <div id="prizeSection" style="display: none;">
         <div class="coupon-box">
           <div class="coupon-name" id="couponText">全單 9 折折價券</div>
@@ -165,26 +164,37 @@
         <button class="btn btn-redeem" onclick="redeemCoupon()">店員專用核銷按鈕</button>
       </div>
 
-      <button class="btn" id="closeBtn" style="margin-top: 10px;" onclick="closeModal()">確認</button>
+      <button class="btn" id="retryBtn" style="display: none;" onclick="initLocationCheck()">重新整理 GPS 定位</button>
+      <button class="btn btn-secondary" id="closeBtn" style="margin-top: 8px;" onclick="closeModal()">關閉</button>
     </div>
   </div>
 
   <script>
     // ==========================================
-    // ⚙️ 門市參數設定
-    // ==========================================
-        // ==========================================
-    // ⚙️ 門市參數設定（正式上線版）
+    // ⚙️ 門市參數設定（野食光精確座標 + 寬容室內飄移半徑）
     // ==========================================
     const STORE_CONFIG = {
-      passcode: "8888",      // 今日消費通關碼
-      lat: 23.04870,         // 野食光門市緯度
-      lng: 120.19830,        // 野食光門市經度
-      radiusMeters: 50,      // 限店內 50 公尺
-      openMins: 9 * 60,      // 09:00 開啟
-      closeMins: 11 * 60     // 11:00 結束
+      passcode: "8888",      
+      lat: 23.04870,         // 野食光緯度
+      lng: 120.19830,        // 野食光經度
+      radiusMeters: 200,     // 👈 設定 200 公尺！能精準擋住不在店附近的客人，又能防止店內室內訊號飄移
     };
 
+    const AREA_MONSTERS = {
+      door: [
+        { name: "門口守護獸・1號怪", imageSrc: "monster_1.png", fallbackEmoji: "🥪", size: 56, speed: 1.5, prize: "門市抵用券 20 元", desc: "在門口捕獲 1 號守護獸！結帳出示畫面可折抵！", weight: 1.0 }
+      ],
+      play: [
+        { name: "遊戲區霸主・2號怪", imageSrc: "monster_2.png", fallbackEmoji: "☕", size: 54, speed: 2.2, prize: "全單 9 折折價券", desc: "在遊戲區捕獲 2 號霸主！結帳出示畫面可享折扣！", weight: 1.0 }
+      ],
+      default: [
+        { name: "野生招牌怪", imageSrc: "monster_1.png", fallbackEmoji: "🥐", size: 56, speed: 1.8, prize: "全單 95 折券", desc: "恭喜收服！結帳出示畫面可折抵！", weight: 1.0 }
+      ]
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentAreaKey = urlParams.get('area') || 'default';
+    const CURRENT_MONSTER_POOL = AREA_MONSTERS[currentAreaKey] || AREA_MONSTERS['default'];
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -198,48 +208,12 @@
     const modalDesc = document.getElementById('modalDesc');
     const prizeSection = document.getElementById('prizeSection');
     const couponText = document.getElementById('couponText');
+    const retryBtn = document.getElementById('retryBtn');
     const closeBtn = document.getElementById('closeBtn');
 
-    // ==========================================
-    // 🍔 自訂怪獸池 (支援去背照片，若無圖片則自動顯示備援 Emoji)
-    // ==========================================
-    const MONSTER_TYPES = [
-      { 
-        name: "野生招牌吐司", 
-        imageSrc: "monster_1.png", 
-        fallbackEmoji: "🥪", 
-        size: 56,                  
-        speed: 1.5, 
-        prize: "謝謝光臨", 
-        desc: "野生優惠溜走了～明天再來撒野試手氣！", 
-        weight: 0.55 
-      },
-      { 
-        name: "暴走特調冰美式", 
-        imageSrc: "monster_2.png", 
-        fallbackEmoji: "☕", 
-        size: 52,
-        speed: 2.3, 
-        prize: "全單 9 折折價券", 
-        desc: "恭喜收服！結帳出示此畫面可享折扣！", 
-        weight: 0.35 
-      },
-      { 
-        name: "黃金酥脆可頌王", 
-        imageSrc: "monster_3.png", 
-        fallbackEmoji: "🥐", 
-        size: 60,
-        speed: 3.5, 
-        prize: "50 元現金抵用券", 
-        desc: "太狂了！抓到傳說神級優惠！", 
-        weight: 0.10 
-      }
-    ];
-
-    // 預先載入圖片快取
     const imageCache = {};
-    MONSTER_TYPES.forEach(m => {
-      if (m.imageSrc) {
+    Object.values(AREA_MONSTERS).flat().forEach(m => {
+      if (m.imageSrc && !imageCache[m.imageSrc]) {
         const img = new Image();
         img.src = m.imageSrc;
         imageCache[m.imageSrc] = { img: img, loaded: false };
@@ -263,20 +237,13 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    function checkHours() {
-      const now = new Date();
-      const current = now.getHours() * 60 + now.getMinutes();
-      return current >= STORE_CONFIG.openMins && current <= STORE_CONFIG.closeMins;
-    }
-
     function initLocationCheck() {
-      if (!checkHours()) {
-        blockUser("雷達休眠中", "撒野計劃僅限門市時段 <b>09:00 - 11:00</b> 開啟，歡迎準時來撒野！");
-        return;
-      }
+      modal.style.display = 'none';
+      retryBtn.style.display = 'none';
+      statusPill.innerText = "📡 正在確認店內位置...";
 
       if (!navigator.geolocation) {
-        blockUser("無法定位", "您的裝置不支援定位，無法啟動撒野雷達。");
+        showPrompt("裝置不支援", "您的手機瀏覽器未開放定位權限，請確認手機設定。");
         return;
       }
 
@@ -284,18 +251,35 @@
         (pos) => {
           const dist = getDistance(pos.coords.latitude, pos.coords.longitude, STORE_CONFIG.lat, STORE_CONFIG.lng);
           if (dist > STORE_CONFIG.radiusMeters) {
-            blockUser("未在店內範圍", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場消費才能啟動撒野雷達！`);
+            statusPill.innerText = "未在店內";
+            showPrompt("未在門市範圍內", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場才能啟動撒野雷達！`, true);
           } else {
-            statusPill.innerText = "等待消費驗證";
+            statusPill.innerText = "📍 已鎖定店內雷達";
+            statusPill.style.background = "#059669";
             tipText.innerText = "請輸入結帳單上的 4 位數通關碼";
             authModal.style.display = 'flex';
           }
         },
         (err) => {
-          blockUser("請開啟定位權限", "請允許瀏覽器存取位置資訊，以確認您已在店內！");
+          statusPill.innerText = "定位中斷";
+          showPrompt("請允許 GPS 定位", "雷達需要確認您在店內現場，請在跳出的提示點擊「允許取得位置資訊」。", true);
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 7000 }
       );
+    }
+
+    function showPrompt(title, msg, showRetry = false) {
+      modalTitle.innerText = title;
+      modalTitle.style.color = "#f43f5e";
+      modalDesc.innerHTML = msg;
+      prizeSection.style.display = 'none';
+      retryBtn.style.display = showRetry ? 'block' : 'none';
+      closeBtn.innerText = "我知道了";
+      modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+      modal.style.display = 'none';
     }
 
     function verifyReceiptCode() {
@@ -308,43 +292,22 @@
       }
     }
 
-    function blockUser(title, msg) {
-      statusPill.innerText = "探測終止";
-      statusPill.style.background = "#475569";
-      tipText.innerText = "無法啟動雷達";
-      modalTitle.innerText = title;
-      modalTitle.style.color = "#f43f5e";
-      modalDesc.innerHTML = msg;
-      prizeSection.style.display = 'none';
-      closeBtn.innerText = "我知道了";
-      closeBtn.onclick = () => { modal.style.display = 'none'; };
-      modal.style.display = 'flex';
-    }
-
     function startRadarScan() {
       scanner.style.display = 'block';
       statusPill.innerText = "雷達感應中...";
       statusPill.style.background = "#0284c7";
-      tipText.innerText = "正在搜尋野生美味，請屏息以待...";
+      tipText.innerText = "正在搜尋該區域野生美味，請屏息以待...";
 
-      const delay = 2000 + Math.random() * 2000;
       setTimeout(() => {
         scanner.style.display = 'none';
-        
-        // 15% 隨機撲空
-        if (Math.random() < 0.15) {
-          blockUser("💨 周圍一片安靜", "雷達感應了一圈，這時候周圍沒有野生優惠出沒。<br><br>稍後或明天再來試試手氣！");
-          return;
-        }
-
         spawnMonster();
-      }, delay);
+      }, 2000);
     }
 
     function spawnMonster() {
       const rand = Math.random();
       let acc = 0;
-      for (const m of MONSTER_TYPES) {
+      for (const m of CURRENT_MONSTER_POOL) {
         acc += m.weight;
         if (rand <= acc) {
           currentMonster = {
@@ -402,7 +365,6 @@
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 背景雷達網格
       ctx.save();
       ctx.strokeStyle = "rgba(72, 202, 228, 0.15)";
       ctx.beginPath();
@@ -412,7 +374,6 @@
       ctx.stroke();
       ctx.restore();
 
-      // 繪製野生怪獸
       if (isSpawned && currentMonster && !currentMonster.isCaptured) {
         const cached = imageCache[currentMonster.imageSrc];
         const s = currentMonster.size || 54;
@@ -434,7 +395,6 @@
         }
       }
 
-      // 繪製精靈球
       if (isSpawned) {
         ctx.save();
         ctx.beginPath();
@@ -518,19 +478,14 @@
     }
 
     function showOutcome() {
-      modalTitle.innerText = currentMonster.prize === "謝謝光臨" ? "💨 掙脫溜走！" : "🎉 撒野成功！";
-      modalTitle.style.color = currentMonster.prize === "謝謝光臨" ? "#94a3b8" : "#48cae4";
+      modalTitle.innerText = "🎉 撒野成功！";
+      modalTitle.style.color = "#48cae4";
       modalDesc.innerHTML = currentMonster.desc;
-
-      if (currentMonster.prize !== "謝謝光臨") {
-        couponText.innerText = currentMonster.prize;
-        prizeSection.style.display = 'block';
-        startTimer();
-      } else {
-        prizeSection.style.display = 'none';
-      }
+      couponText.innerText = currentMonster.prize;
+      prizeSection.style.display = 'block';
+      retryBtn.style.display = 'none';
       closeBtn.innerText = "完成";
-      closeBtn.onclick = () => { modal.style.display = 'none'; };
+      startTimer();
       modal.style.display = 'flex';
     }
 
