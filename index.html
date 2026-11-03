@@ -242,7 +242,8 @@
 
     let currentMonster = null;
     let isSpawned = false;
-    let ball = { x: 160, y: 310, radius: 20, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
+    // 將 radius 稍微加大一點，讓手手的判定範圍大一點
+    let ball = { x: 160, y: 310, radius: 25, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
     let isShaking = false;
     let shakeCount = 0;
 
@@ -355,7 +356,7 @@
 
       statusPill.innerText = `⚠️ 發現【${currentMonster.name}】！`;
       statusPill.style.background = "#e63946";
-      tipText.innerText = "按住下方精靈球，向上滑動丟出！";
+      tipText.innerText = "按住下方小手手 🖐️，向上滑動去抓！";
     }
 
     function loop() {
@@ -411,27 +412,15 @@
       ctx.stroke();
       ctx.restore();
 
-      // 精靈球
+      // 畫小手手 (取代原本的精靈球)
       if (isSpawned) {
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, ball.radius, Math.PI, 0, false);
-        ctx.fillStyle = "#e63946";
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "#fff";
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI, false);
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = "#333";
-        ctx.fill();
+        ctx.font = `${ball.radius * 2}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // 如果球被丟出去了，手手可以換個姿勢 (✊) 表示抓取中
+        const handEmoji = ball.isThrown ? "✊" : "🖐️";
+        ctx.fillText(handEmoji, ball.x, ball.y);
         ctx.restore();
       }
     }
@@ -471,7 +460,7 @@
       ball.isThrown = false;
       isShaking = true;
       shakeCount = 0;
-      tipText.innerText = "🎯 命中怪獸！正在收服中...";
+      tipText.innerText = "🎯 抓到了！拉回中...";
 
       monsterVideo.style.display = 'none';
 
@@ -493,7 +482,7 @@
       ball.vx = 0;
       ball.vy = 0;
       ball.isThrown = false;
-      tipText.innerText = "沒砸中！快再丟一顆！";
+      tipText.innerText = "沒抓到！快再試一次！";
     }
 
     function showOutcome() {
