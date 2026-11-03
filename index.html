@@ -42,7 +42,7 @@
       box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
     }
 
-    #gameCanvas { width: 100%; height: 100%; touch-action: none; }
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; }
 
     .radar-scanner {
       position: absolute;
@@ -153,7 +153,7 @@
   <!-- 提示 / 結果彈窗 -->
   <div class="modal" id="resultModal">
     <div class="card">
-      <h3 id="modalTitle">提示</h3>
+      <h3 id="modalTitle">🎉 撒野成果！</h3>
       <p id="modalDesc"></p>
 
       <div id="prizeSection" style="display: none;">
@@ -174,21 +174,19 @@
     // ⚙️ 門市參數設定
     // ==========================================
     const STORE_CONFIG = {
-      passcode: "8888",      // 通關碼
-      lat: 23.04722,         // 現場實測緯度
-      lng: 120.18278,        // 現場實測經度
-      radiusMeters: 2500     // 容許半徑 2500 公尺
+      passcode: "8888",
+      lat: 23.04722,
+      lng: 120.18278,
+      radiusMeters: 2500
     };
 
-    // ==========================================
-    // 📍 4 大指定獎項怪獸庫 (雙怪獸圖片強制更新版)
-    // ==========================================
+    // 4 大指定獎項怪獸庫 (雙重檔名支援，確保讀得到粉紅小怪獸)
     const CURRENT_MONSTER_POOL = [
       {
         name: "小省守護獸・10元怪",
-        imageSrc: "monster_1.png?v=9999", // 呼叫 1 號怪獸
+        imgList: ["monster_1.png", "Untitled design.png"],
         fallbackEmoji: "🪙",
-        size: 56,
+        size: 70,
         speed: 1.5,
         prize: "折價券 10 元（限本月使用完畢）",
         desc: "收服成功！憑此畫面【結帳總金額直接折抵 10 元】（非打折），請於本月使用完畢喔！",
@@ -196,9 +194,9 @@
       },
       {
         name: "回甘茶仙・紅茶怪",
-        imageSrc: "monster_2.png?v=9999", // 呼叫 2 號怪獸
+        imgList: ["monster_2.png", "monster_1.png", "Untitled design.png"],
         fallbackEmoji: "🥤",
-        size: 54,
+        size: 70,
         speed: 1.8,
         prize: "不多不少中杯紅茶一杯",
         desc: "捕捉到清涼茶仙！結帳出示畫面，兌換中杯紅茶一杯！",
@@ -206,9 +204,9 @@
       },
       {
         name: "微笑調皮鬼・明日怪",
-        imageSrc: "monster_1.png?v=9999", // 呼叫 1 號怪獸
+        imgList: ["monster_1.png", "Untitled design.png"],
         fallbackEmoji: "👋",
-        size: 52,
+        size: 70,
         speed: 2.2,
         prize: "謝謝光臨，明天要再來喔",
         desc: "哎呀！怪獸溜走了～但野食光永遠歡迎您，明天要再來喔！",
@@ -216,9 +214,9 @@
       },
       {
         name: "飽足堡主・漢堡怪",
-        imageSrc: "monster_2.png?v=9999", // 呼叫 2 號怪獸
+        imgList: ["monster_2.png", "monster_1.png", "Untitled design.png"],
         fallbackEmoji: "🍔",
-        size: 58,
+        size: 70,
         speed: 2.0,
         prize: "豬肉漢堡堡一顆",
         desc: "太幸運啦！捕獲超人氣飽足怪，送您豬肉漢堡堡一顆！",
@@ -241,20 +239,22 @@
     const retryBtn = document.getElementById('retryBtn');
     const closeBtn = document.getElementById('closeBtn');
 
-    // 預載圖片
+    // 智能圖片預載
     const imageCache = {};
-    CURRENT_MONSTER_POOL.forEach(m => {
-      if (m.imageSrc && !imageCache[m.imageSrc]) {
+    function loadImage(src) {
+      if (!imageCache[src]) {
         const img = new Image();
-        img.src = m.imageSrc;
-        imageCache[m.imageSrc] = { img: img, loaded: false };
-        img.onload = () => { imageCache[m.imageSrc].loaded = true; };
+        img.src = src + "?t=" + new Date().getTime();
+        imageCache[src] = { img: img, loaded: false };
+        img.onload = () => { imageCache[src].loaded = true; };
       }
-    });
+      return imageCache[src];
+    }
+    CURRENT_MONSTER_POOL.forEach(m => m.imgList.forEach(src => loadImage(src)));
 
     let currentMonster = null;
     let isSpawned = false;
-    let ball = { x: 160, y: 310, radius: 18, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
+    let ball = { x: 160, y: 310, radius: 20, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
     let isShaking = false;
     let shakeCount = 0;
 
@@ -274,7 +274,7 @@
       statusPill.innerText = "📡 正在確認店內位置...";
 
       if (!navigator.geolocation) {
-        showPrompt("裝置不支援", "您的裝置未開放定位權限，請確認瀏覽器設定。");
+        showPrompt("裝置不支援", "您的裝置未開放定位權限。");
         return;
       }
 
@@ -293,7 +293,7 @@
         },
         (err) => {
           statusPill.innerText = "定位中斷";
-          showPrompt("請允許 GPS 定位", "雷達需要確認您在店內現場，請在跳出的提示點擊「允許取得位置資訊」。", true);
+          showPrompt("請允許 GPS 定位", "雷達需要確認您在店內現場，請在跳出的提示點擊「允許」。", true);
         },
         { enableHighAccuracy: true, timeout: 7000 }
       );
@@ -343,21 +343,26 @@
         if (rand <= acc) {
           currentMonster = {
             ...m,
-            x: 60 + Math.random() * 200,
-            y: 50 + Math.random() * 80,
-            radius: (m.size || 54) / 2,
+            x: 160,
+            y: 70,
+            radius: m.size / 2,
             vx: (Math.random() > 0.5 ? 1 : -1) * m.speed,
-            vy: (Math.random() > 0.5 ? 1 : -1) * (m.speed * 0.7),
+            vy: (Math.random() > 0.5 ? 0.6 : -0.6) * m.speed,
             isCaptured: false
           };
           break;
         }
       }
 
+      ball.x = 160;
+      ball.y = 310;
+      ball.isThrown = false;
+      ball.isDragging = false;
       isSpawned = true;
+
       statusPill.innerText = `⚠️ 發現【${currentMonster.name}】！`;
       statusPill.style.background = "#e63946";
-      tipText.innerText = "快！向上滑動精靈球丟擲捕捉！";
+      tipText.innerText = "按住下方精靈球，向上滑動丟出！";
     }
 
     function loop() {
@@ -365,19 +370,20 @@
         currentMonster.x += currentMonster.vx;
         currentMonster.y += currentMonster.vy;
 
-        if (currentMonster.x - currentMonster.radius < 15 || currentMonster.x + currentMonster.radius > canvas.width - 15) {
+        if (currentMonster.x - currentMonster.radius < 20 || currentMonster.x + currentMonster.radius > canvas.width - 20) {
           currentMonster.vx *= -1;
         }
-        if (currentMonster.y - currentMonster.radius < 15 || currentMonster.y + currentMonster.radius > 160) {
+        if (currentMonster.y - currentMonster.radius < 20 || currentMonster.y + currentMonster.radius > 150) {
           currentMonster.vy *= -1;
         }
       }
 
+      // 只有在玩家主動往上滑丟出去，且球飛到上半部時，才做碰撞偵測
       if (ball.isThrown && !isShaking) {
         ball.x += ball.vx;
         ball.y += ball.vy;
 
-        if (isSpawned && currentMonster && !currentMonster.isCaptured) {
+        if (isSpawned && currentMonster && !currentMonster.isCaptured && ball.y < 220) {
           const dist = Math.hypot(ball.x - currentMonster.x, ball.y - currentMonster.y);
           if (dist < ball.radius + currentMonster.radius) {
             triggerHit();
@@ -396,8 +402,10 @@
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // 背景雷達同心圓
       ctx.save();
-      ctx.strokeStyle = "rgba(72, 202, 228, 0.15)";
+      ctx.strokeStyle = "rgba(72, 202, 228, 0.2)";
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(160, 180, 50, 0, Math.PI * 2);
       ctx.arc(160, 180, 100, 0, Math.PI * 2);
@@ -405,27 +413,29 @@
       ctx.stroke();
       ctx.restore();
 
+      // 畫怪獸
       if (isSpawned && currentMonster && !currentMonster.isCaptured) {
-        const cached = imageCache[currentMonster.imageSrc];
-        const s = currentMonster.size || 54;
+        const s = currentMonster.size;
+        let drawn = false;
 
-        if (cached && cached.loaded) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.ellipse(currentMonster.x, currentMonster.y + s/2 - 2, s/2.5, 6, 0, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(0,0,0,0.35)";
-          ctx.fill();
+        for (const src of currentMonster.imgList) {
+          const cached = imageCache[src];
+          if (cached && cached.loaded && cached.img.naturalWidth > 0) {
+            ctx.drawImage(cached.img, currentMonster.x - s/2, currentMonster.y - s/2, s, s);
+            drawn = true;
+            break;
+          }
+        }
 
-          ctx.drawImage(cached.img, currentMonster.x - s/2, currentMonster.y - s/2, s, s);
-          ctx.restore();
-        } else {
-          ctx.font = `${s * 0.65}px sans-serif`;
+        if (!drawn) {
+          ctx.font = `${s * 0.75}px sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(currentMonster.fallbackEmoji || "🎁", currentMonster.x, currentMonster.y);
+          ctx.fillText(currentMonster.fallbackEmoji, currentMonster.x, currentMonster.y);
         }
       }
 
+      // 畫精靈球
       if (isSpawned) {
         ctx.save();
         ctx.beginPath();
@@ -443,7 +453,7 @@
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(ball.x, ball.y, 4, 0, Math.PI * 2);
+        ctx.arc(ball.x, ball.y, 5, 0, Math.PI * 2);
         ctx.fillStyle = "#333";
         ctx.fill();
         ctx.restore();
@@ -451,13 +461,13 @@
     }
 
     canvas.addEventListener('touchstart', (e) => {
-      if (!isSpawned) return;
+      if (!isSpawned || ball.isThrown || isShaking) return;
       const t = e.touches[0];
       const rect = canvas.getBoundingClientRect();
       const tx = t.clientX - rect.left;
       const ty = t.clientY - rect.top;
 
-      if (!ball.isThrown && Math.hypot(tx - ball.x, ty - ball.y) < 35) {
+      if (Math.hypot(tx - ball.x, ty - ball.y) < 45) {
         ball.isDragging = true;
         ball.startX = tx;
         ball.startY = ty;
@@ -485,7 +495,7 @@
       ball.isThrown = false;
       isShaking = true;
       shakeCount = 0;
-      tipText.innerText = "命中！正在收服中...";
+      tipText.innerText = "🎯 命中怪獸！正在收服中...";
 
       const interval = setInterval(() => {
         shakeCount++;
