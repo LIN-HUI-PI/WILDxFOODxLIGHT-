@@ -42,21 +42,7 @@
       box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
     }
 
-    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; position: absolute; inset: 0; z-index: 2; }
-
-    /* 真實動態怪獸影片層 (圓形懸浮) */
-    #monsterVideo {
-      position: absolute;
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      object-fit: cover;
-      display: none;
-      z-index: 1;
-      pointer-events: none;
-      box-shadow: 0 0 15px rgba(255,255,255,0.4);
-      border: 2px solid rgba(255,255,255,0.8);
-    }
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; }
 
     .radar-scanner {
       position: absolute;
@@ -66,7 +52,6 @@
       animation: scan 2s linear infinite;
       pointer-events: none;
       display: none;
-      z-index: 3;
     }
     @keyframes scan {
       from { transform: rotate(0deg); }
@@ -75,4 +60,33 @@
 
     .tip-text { font-size: 0.85rem; color: #adb5bd; margin-bottom: 8px; text-align: center; }
 
-    /* 
+    /* 彈窗樣式 */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border: 2px solid #48cae4;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+    }
+    .card h3 { font-size: 1.35rem; margin-bottom: 8px; }
+    .card p { font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 16px; }
+
+    .code-input {
+      width: 180px;
+      font-size: 1.5rem;
+      letter-spacing: 6px;
+      text-align: center;
+      padding
