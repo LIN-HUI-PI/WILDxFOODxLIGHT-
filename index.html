@@ -2,504 +2,77 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <title>門市限定・撒野計劃</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
     body {
-      background-color: #0b192c;
-      color: #ffffff;
-      min-height: 100vh;
+      background: radial-gradient(circle at center, #1b263b 0%, #0d1b2a 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
-      padding: 24px 16px;
+      height: 100vh;
       overflow: hidden;
+      padding: 24px 16px;
     }
 
-    /* 頂部標題與警示條 */
-    .header-area {
-      width: 100%;
-      max-width: 380px;
-      text-align: center;
-    }
-    .header-title {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      margin-bottom: 12px;
-      color: #38bdf8;
-    }
-    .alert-banner {
-      background: linear-gradient(90deg, #ef4444, #f97316);
-      color: #ffffff;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 8px 16px;
-      border-radius: 9999px;
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
-      animation: pulse 1.8s infinite ease-in-out;
+    .top-bar { width: 100%; max-width: 320px; text-align: center; }
+    .top-bar h1 { font-size: 1.25rem; color: #48cae4; margin-bottom: 4px; letter-spacing: 1px; }
+    .status-pill {
+      display: inline-block;
+      font-size: 0.8rem;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 12px;
+      border-radius: 20px;
+      color: #90e0ef;
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.02); opacity: 0.9; }
-    }
-
-    /* 雷達主畫布區域 */
-    .radar-container {
+    /* 雷達視窗 */
+    .radar-wrapper {
       position: relative;
       width: 320px;
-      height: 320px;
-      border-radius: 28px;
-      border: 3px solid #38bdf8;
-      background: radial-gradient(circle, #0e2a47 0%, #071322 100%);
-      box-shadow: 0 0 24px rgba(56, 189, 248, 0.25);
+      height: 360px;
+      background: radial-gradient(circle, #1e3d59 0%, #17252a 80%);
+      border: 3px solid #48cae4;
+      border-radius: 24px;
       overflow: hidden;
-      margin: auto 0;
+      box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
     }
 
-    /* 雷達同心圓背景線條 */
-    .circle-1, .circle-2, .circle-3 {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      border: 1px solid rgba(56, 189, 248, 0.18);
-    }
-    .circle-1 { width: 90px; height: 90px; }
-    .circle-2 { width: 190px; height: 190px; }
-    .circle-3 { width: 280px; height: 280px; }
-    .cross-line {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      width: 100%;
-      height: 1px;
-      background: rgba(56, 189, 248, 0.15);
-    }
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; position: absolute; inset: 0; z-index: 2; }
 
-    /* 雷達掃描扇形 */
-    .scanner {
+    /* 真實動態怪獸影片層 (圓形懸浮) */
+    #monsterVideo {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      width: 80px;
+      height: 80px;
       border-radius: 50%;
-      background: conic-gradient(from 0deg, rgba(56, 189, 248, 0.25) 0deg, transparent 60deg, transparent 360deg);
-      animation: scan 4s linear infinite;
+      object-fit: cover;
+      display: none;
+      z-index: 1;
       pointer-events: none;
+      box-shadow: 0 0 15px rgba(255,255,255,0.4);
+      border: 2px solid rgba(255,255,255,0.8);
+    }
+
+    .radar-scanner {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: conic-gradient(from 0deg, rgba(72, 202, 228, 0.35) 0deg, transparent 60deg);
+      animation: scan 2s linear infinite;
+      pointer-events: none;
+      display: none;
+      z-index: 3;
     }
     @keyframes scan {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
-    /* 雷達中的怪獸目標點（直接使用怪獸 SVG 頭像） */
-    .target-dot {
-      position: absolute;
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      border: 2px solid #ffffff;
-      box-shadow: 0 0 16px rgba(255, 255, 255, 0.8), 0 0 28px rgba(56, 189, 248, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      animation: dotGlow 1.6s infinite alternate ease-in-out;
-      background-color: #ffffff;
-      overflow: hidden;
-    }
-    .target-dot svg, .target-dot img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-    @keyframes dotGlow {
-      0% { transform: scale(0.95); box-shadow: 0 0 12px #ffffff; }
-      100% { transform: scale(1.08); box-shadow: 0 0 24px #38bdf8; }
-    }
+    .tip-text { font-size: 0.85rem; color: #adb5bd; margin-bottom: 8px; text-align: center; }
 
-    /* 小手滑動抓取器 */
-    .hand-grabber {
-      position: absolute;
-      width: 60px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 38px;
-      bottom: 24px;
-      left: 130px;
-      touch-action: none;
-      cursor: grab;
-      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
-    }
-
-    /* 底部操作指示 */
-    .footer-hint {
-      font-size: 14px;
-      color: #94a3b8;
-      letter-spacing: 1px;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    /* 彈窗／領取層 */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.85);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      z-index: 999;
-    }
-    .modal-card {
-      background: #1e293b;
-      border: 2px solid #38bdf8;
-      border-radius: 20px;
-      padding: 24px 20px;
-      width: 100%;
-      max-width: 340px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    }
-    .monster-avatar-modal {
-      width: 90px;
-      height: 90px;
-      margin: 0 auto 12px;
-      border-radius: 50%;
-      border: 3px solid #facc15;
-      background: #ffffff;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .monster-avatar-modal svg, .monster-avatar-modal img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-    .modal-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #38bdf8;
-      margin-bottom: 8px;
-    }
-    .monster-badge {
-      font-size: 20px;
-      color: #facc15;
-      font-weight: 700;
-      margin-bottom: 16px;
-    }
-    .reward-box {
-      background: #0f172a;
-      border: 1px dashed #38bdf8;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-    .reward-name {
-      font-size: 17px;
-      font-weight: 700;
-      color: #4ade80;
-    }
-    .input-field {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #475569;
-      background: #0f172a;
-      color: #ffffff;
-      font-size: 16px;
-      text-align: center;
-      margin-bottom: 12px;
-      outline: none;
-    }
-    .input-field:focus {
-      border-color: #38bdf8;
-    }
-    .submit-btn {
-      width: 100%;
-      padding: 12px;
-      background: #38bdf8;
-      color: #0b192c;
-      font-size: 16px;
-      font-weight: 700;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    /* 已領取過畫面的鎖定狀態 */
-    .locked-view {
-      display: none;
-      width: 100%;
-      max-width: 360px;
-      margin: auto 0;
-      background: #1e293b;
-      border: 2px solid #64748b;
-      border-radius: 20px;
-      padding: 28px 20px;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- 頂部標題區域 -->
-  <div class="header-area" id="headerArea">
-    <div class="header-title">門市限定・撒野計劃</div>
-    <!-- 抓取前保持神祕，不提前透露怪物名稱與獎項 -->
-    <div class="alert-banner" id="radarAlert">
-      ⚠️ 雷達感應中：前方有不明微弱訊號，快滑動捕捉！
-    </div>
-  </div>
-
-  <!-- 雷達遊戲畫面 -->
-  <div class="radar-container" id="radarContainer">
-    <div class="circle-1"></div>
-    <div class="circle-2"></div>
-    <div class="circle-3"></div>
-    <div class="cross-line"></div>
-    <div class="scanner"></div>
-
-    <!-- 雷達中的小怪獸圖標 -->
-    <div class="target-dot" id="targetDot" style="top: 60px; left: 45px;">
-      <!-- 若專案目錄下有名為 monster.png 的圖片檔，可改成 <img src="monster.png"> -->
-      <svg viewBox="0 0 100 100" width="100%" height="100%">
-        <!-- 蝴蝶結 -->
-        <polygon points="76,26 88,18 84,32" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
-        <polygon points="86,34 98,24 94,38" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
-        <circle cx="85" cy="30" r="3.5" fill="#3b0712"/>
-        <!-- 粉紫波浪怪獸身體 -->
-        <path d="M 28,26 C 42,16 68,14 74,28 C 80,42 66,56 78,74 C 70,88 38,94 24,80 C 14,70 18,36 28,26 Z" 
-              fill="#bf6f82" stroke="#1e293b" stroke-width="5" stroke-linejoin="round"/>
-        <!-- 左眼 -->
-        <circle cx="38" cy="44" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
-        <circle cx="39" cy="44" r="2.2" fill="#0f172a"/>
-        <!-- 右眼 -->
-        <circle cx="62" cy="52" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
-        <circle cx="63" cy="52" r="2.2" fill="#0f172a"/>
-        <!-- 微笑嘴巴 -->
-        <path d="M 39,64 Q 45,74 54,66" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-    </div>
-
-    <!-- 玩家滑動的小手手 -->
-    <div class="hand-grabber" id="handGrabber">🖐️</div>
-  </div>
-
-  <!-- 底部提示文字 -->
-  <div class="footer-hint" id="footerHint">
-    按住下方小手手 🖐️，向上滑動去抓！
-  </div>
-
-  <!-- 捕捉成功後彈窗 -->
-  <div class="modal-overlay" id="claimModal">
-    <div class="modal-card">
-      <div class="monster-avatar-modal" id="modalMonsterAvatar">
-        <svg viewBox="0 0 100 100" width="100%" height="100%">
-          <polygon points="76,26 88,18 84,32" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
-          <polygon points="86,34 98,24 94,38" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
-          <circle cx="85" cy="30" r="3.5" fill="#3b0712"/>
-          <path d="M 28,26 C 42,16 68,14 74,28 C 80,42 66,56 78,74 C 70,88 38,94 24,80 C 14,70 18,36 28,26 Z" 
-                fill="#bf6f82" stroke="#1e293b" stroke-width="5" stroke-linejoin="round"/>
-          <circle cx="38" cy="44" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
-          <circle cx="39" cy="44" r="2.2" fill="#0f172a"/>
-          <circle cx="62" cy="52" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
-          <circle cx="63" cy="52" r="2.2" fill="#0f172a"/>
-          <path d="M 39,64 Q 45,74 54,66" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <div class="modal-title">🎉 成功捕獲夥伴！</div>
-      <div class="monster-badge" id="modalMonsterName">【微笑調皮鬼・明日怪】</div>
-      <div class="reward-box">
-        <div style="font-size:13px; color:#94a3b8; margin-bottom:6px;">獲得門市專屬兌換券</div>
-        <div class="reward-name" id="modalRewardName">主餐折抵 20 元優惠券</div>
-      </div>
-      <input type="tel" id="userPhone" class="input-field" placeholder="請輸入手機號碼 (09xxxxxxxx)" maxlength="10">
-      <button class="submit-btn" id="claimBtn">確認綁定並領取</button>
-      <div style="font-size:11px; color:#64748b; margin-top:8px;">每人限領一次，送出後即鎖定本機與門號</div>
-    </div>
-  </div>
-
-  <!-- 已領取過的鎖定卡片 -->
-  <div class="locked-view" id="lockedView">
-    <div style="font-size: 32px; margin-bottom: 12px;">✅</div>
-    <div style="font-size: 20px; font-weight:700; color:#38bdf8; margin-bottom: 8px;">您已完成本門市活動</div>
-    <p style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">同台裝置或手機門號僅限領取一次</p>
-    
-    <div class="reward-box" style="text-align: left;">
-      <div style="font-size:12px; color:#94a3b8;">綁定門號：<span id="lockedPhone" style="color:#ffffff;">09xxxxxxxx</span></div>
-      <div style="font-size:12px; color:#94a3b8; margin-top:4px;">捕獲夥伴：<span id="lockedMonster" style="color:#facc15;">微笑調皮鬼・明日怪</span></div>
-      <div style="font-size:14px; color:#4ade80; font-weight:700; margin-top:8px;" id="lockedReward">主餐折抵 20 元優惠券</div>
-    </div>
-
-    <div style="font-size: 12px; color: #64748b;">結帳時請主動出示此畫面給門市夥伴確認</div>
-  </div>
-
-  <script>
-    const MONSTER_INFO = {
-      name: "微笑調皮鬼・明日怪",
-      reward: "主餐折抵 20 元優惠券"
-    };
-
-    let isDragging = false;
-    let startX = 0, startY = 0;
-    let initLeft = 130, initBottom = 24;
-
-    const radarContainer = document.getElementById('radarContainer');
-    const targetDot = document.getElementById('targetDot');
-    const handGrabber = document.getElementById('handGrabber');
-    const claimModal = document.getElementById('claimModal');
-    const userPhoneInput = document.getElementById('userPhone');
-    const claimBtn = document.getElementById('claimBtn');
-    const lockedView = document.getElementById('lockedView');
-    const headerArea = document.getElementById('headerArea');
-    const footerHint = document.getElementById('footerHint');
-
-    // 1. 頁面載入時檢查是否已領取過
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedRecord = localStorage.getItem('yeshiguang_user_coupon');
-      if (savedRecord) {
-        showLockedScreen(JSON.parse(savedRecord));
-      } else {
-        initGame();
-      }
-    });
-
-    // 2. 初始化怪獸位置（隨機分布在雷達上半部）
-    function initGame() {
-      const randomX = Math.floor(Math.random() * 180) + 40;
-      const randomY = Math.floor(Math.random() * 110) + 40;
-      targetDot.style.left = `${randomX}px`;
-      targetDot.style.top = `${randomY}px`;
-
-      setupHandTouchControls();
-    }
-
-    // 3. 拖曳手勢捕捉
-    function setupHandTouchControls() {
-      handGrabber.addEventListener('pointerdown', (e) => {
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        handGrabber.setPointerCapture(e.pointerId);
-      });
-
-      handGrabber.addEventListener('pointermove', (e) => {
-        if (!isDragging) return;
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-
-        let newLeft = initLeft + deltaX;
-        let newBottom = initBottom - deltaY;
-
-        newLeft = Math.max(10, Math.min(250, newLeft));
-        newBottom = Math.max(10, Math.min(250, newBottom));
-
-        handGrabber.style.left = `${newLeft}px`;
-        handGrabber.style.bottom = `${newBottom}px`;
-
-        checkCollision();
-      });
-
-      handGrabber.addEventListener('pointerup', () => {
-        if (!isDragging) return;
-        isDragging = false;
-        handGrabber.style.left = `${initLeft}px`;
-        handGrabber.style.bottom = `${initBottom}px`;
-      });
-    }
-
-    // 檢測小手與怪獸距離
-    function checkCollision() {
-      const handRect = handGrabber.getBoundingClientRect();
-      const dotRect = targetDot.getBoundingClientRect();
-
-      const handCenterX = handRect.left + handRect.width / 2;
-      const handCenterY = handRect.top + handRect.height / 2;
-      const dotCenterX = dotRect.left + dotRect.width / 2;
-      const dotCenterY = dotRect.top + dotRect.height / 2;
-
-      const distance = Math.hypot(handCenterX - dotCenterX, handCenterY - dotCenterY);
-
-      if (distance < 48) { // 成功碰觸怪獸
-        isDragging = false;
-        onCatchSuccess();
-      }
-    }
-
-    // 4. 成功抓到怪獸
-    function onCatchSuccess() {
-      targetDot.style.display = 'none';
-      document.getElementById('modalMonsterName').innerText = `【${MONSTER_INFO.name}】`;
-      document.getElementById('modalRewardName').innerText = MONSTER_INFO.reward;
-      claimModal.style.display = 'flex';
-    }
-
-    // 5. 門號防重複領取驗證
-    claimBtn.addEventListener('click', () => {
-      const phone = userPhoneInput.value.trim();
-
-      if (!/^09\d{8}$/.test(phone)) {
-        alert("請輸入正確的手機號碼（共10碼，例如：0912345678）");
-        return;
-      }
-
-      // 檢查此號碼是否曾被領取過
-      const claimedPhones = JSON.parse(localStorage.getItem('yeshiguang_claimed_phones') || '[]');
-      if (claimedPhones.includes(phone)) {
-        alert("⚠️ 此手機號碼已經領取過獎項囉！無法重複領取。");
-        return;
-      }
-
-      claimedPhones.push(phone);
-      localStorage.setItem('yeshiguang_claimed_phones', JSON.stringify(claimedPhones));
-
-      const couponRecord = {
-        phone: phone,
-        monster: MONSTER_INFO.name,
-        reward: MONSTER_INFO.reward,
-        date: new Date().toLocaleDateString('zh-TW')
-      };
-      localStorage.setItem('yeshiguang_user_coupon', JSON.stringify(couponRecord));
-
-      claimModal.style.display = 'none';
-      alert(`🎉 恭喜！兌換券已成功綁定至手機：${phone}`);
-      showLockedScreen(couponRecord);
-    });
-
-    // 6. 鎖定畫面
-    function showLockedScreen(record) {
-      headerArea.style.display = 'none';
-      radarContainer.style.display = 'none';
-      footerHint.style.display = 'none';
-      claimModal.style.display = 'none';
-
-      document.getElementById('lockedPhone').innerText = record.phone;
-      document.getElementById('lockedMonster').innerText = record.monster;
-      document.getElementById('lockedReward').innerText = record.reward;
-      lockedView.style.display = 'block';
-    }
-  </script>
-</body>
-</html>
+    /* 
