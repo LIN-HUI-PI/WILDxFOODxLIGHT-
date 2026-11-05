@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>店員專用</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1b2a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px 16px 40px; max-width: 420px; margin: 0 auto; }
+    h1 { font-size: 1.2rem; color: #48cae4; margin-bottom: 16px; text-align: center; }
+    .card { background: #1e293b; border: 2px solid #48cae4; border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    .card h2 { font-size: 1rem; margin-bottom: 12px; color: #90e0ef; }
+    input { width: 100%; font-size: 1.1rem; padding: 10px 12px; border: 2px solid #48cae4; border-radius: 12px; background: #0f172a; color: #fff; outline: none; margin-bottom: 12px; }
+    .btn { background: #48cae4; color: #0b132b; border: none; font-weight: bold; padding: 12px; border-radius: 22px; width: 100%; font-size: 0.95rem; cursor: pointer; }
+    .btn:disabled { opacity: 0.6; }
+    .btn-red { background: #e11d48; color: #fff; margin-top: 8px; }
+    .msg { color: #fb7185; font-size: 0.85rem; margin-top: 10px; }
+    .big { font-size: 2.4rem; font-weight: bold; letter-spacing: 8px; text-align: center; color: #facc15; margin: 8px 0; }
+    .small { font-size: 0.8rem; color: #94a3b8; text-align: center; }
+    .item { background: #0f172a; border-radius: 12px; padding: 12px; margin-top: 10px; }
+    .item b { color: #facc15; }
+    .tag { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+    .tag-ok { background: #059669; }
+    .tag-bad { background: #64748b; }
+    .hist { font-size: 0.85rem; color: #cbd5e1; margin-top: 10px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>撒野計劃・店員專用</h1>
+
+  <div class="card" id="loginCard">
+    <h2>店員登入</h2>
+    <input type="password" id="pinInput" placeholder="請輸入店員密碼">
+    <button class="btn" id="loginBtn" onclick="login()">登入</button>
+    <div class="msg hidden" id="loginMsg"></div>
+  </div>
+
+  <div id="mainArea" class="hidden">
+    <div class="card">
+      <h2>產生通關碼</h2>
+      <button class="btn" id="codeBtn" onclick="newCode()">產生新通關碼</button>
+      <div class="big" id="codeShow"></div>
+      <div class="small" id="codeNote"></div>
+      <div class="hist" id="codeHist"></div>
+      <div class="msg hidden" id="codeMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>核銷</h2>
+      <input type="text" id="qInput" placeholder="輸入客人的兌換碼，或手機末 4 碼">
+      <button class="btn" id="lookBtn" onclick="lookup()">查詢</button>
+      <div id="results"></div>
+      <div class="msg hidden" id="lookMsg"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwmo2Xrn9yLmELZeDDnl1oxbgBpSeHjrqyguau4WNEs47zTMLiZysB25sDrhK9Vx2N-uQ/exec";
+    let pin = "";
+    const history = [];
+
+    const errs = {
+      badpin: "密碼錯誤",
+      locked: "嘗試次數過多，請稍後再試",
+      neterr: "網路連線失敗",
+      nourl: "尚未設定雲端網址",
+      error: "發生錯誤"
+    };
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function show(id, text) {
+      const el = document.getElementById(id);
+      el.innerText = text;
+      el.classList.remove("hidden");
+    }
+    function hide(id) { document.getElementById(id).classList.add("hidden"); }
+    function pad2(n) { return String(n).padStart(2, "0"); }
+    function fmt(ts) {
+      const d = new Date(Number(ts));
+      return (d.getMonth() + 1) + "/" + d.getDate() + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+    }
+
+    async function api(action, payload) {
+      if (!API_URL) return { status: "nourl" };
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(Object.assign({ action: action, pin: pin }, payload))
+        });
+        return await res.json();
+      } catch (e) {
+        return { status: "neterr" };
+      }
+    }
+
+    async function login() {
+      pin = document.getElementById("pinInput").value;
+      const btn = document.getElementById("loginBtn");
+      btn.disabled = true;
+      hide("loginMsg");
+      const r = await api("staffPing", {});
+      btn.disabled = false;
+      if (r.status === "ok") {
+        document.getElementById("loginCard").classList.add("hidden");
+        document.getElementById("mainArea").classList.remove("hidden");
+      } else {
+        show("loginMsg", errs[r.status] || errs.error);
+      }
+    }
+
+    async function newCode() {
+      const btn = document.getElementById("codeBtn");
+      btn.disabled = true;
+      hide("codeMsg");
+      const r = await api("staffNewCode", {});
+      btn.disabled = false;
+      if (r.status === "ok") {
+        document.getElementById("codeShow").innerText = r.code;
+        document.getElementById("codeNote").innerText = "單次使用，" + r.ttlMin + " 分鐘內有效";
+        history.unshift(r.code + "（" + fmt(Date.now()) + "）");
+        if (history.length > 5) history.pop();
+        document.getElementById("codeHist").innerText = "本次已產生：" + history.join("、");
+      } else {
+        show("codeMsg", errs[r.status] || errs.error);
+      }
+    }
+
+    async function lookup() {
+      const q = document.getElementById("qInput").value.trim();
+      if (!q) return;
+      const btn = document.getElementById("lookBtn");
+      btn.disabled = true;
+      hide("lookMsg");
+      const r = await api("staffLookup", { q: q });
+      btn.disabled = false;
+      const box = document.getElementById("results");
+      box.innerHTML = "";
+      if (r.status !== "ok") { show("lookMsg", errs[r.status] || errs.error); return; }
+      if (!r.results.length) { show("lookMsg", "查無資料"); return; }
+      r.results.forEach(it => {
+        let tag = '<span class="tag tag-ok">可核銷</span>';
+        let canRedeem = true;
+        if (it.redeemed) { tag = '<span class="tag tag-bad">已核銷</span>'; canRedeem = false; }
+        else if (it.expired) { tag = '<span class="tag tag-bad">已逾期</span>'; canRedeem = false; }
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML =
+          "<div>兌換碼 <b>" + esc(it.claimId) + "</b>" + tag + "</div>" +
+          "<div style='margin-top:6px'>" + esc(it.monster.name) + "</div>" +
+          "<div style='color:#facc15'>" + esc(it.monster.prize) + "</div>" +
+          "<div class='small' style='text-align:left;margin-top:6px'>手機末 4 碼 " + esc(it.phoneTail) + "｜領取 " + fmt(it.claimedAt) + "｜有效至 " + fmt(it.expiresAt) + "</div>";
+        if (canRedeem) {
+          const b = document.createElement("button");
+          b.className = "btn btn-red";
+          b.innerText = "確認核銷";
+          b.onclick = () => redeem(it.claimId, b);
+          div.appendChild(b);
+        }
+        box.appendChild(div);
+      });
+    }
+
+    async function redeem(claimId, btn) {
+      if (!confirm("確認核銷兌換碼 " + claimId + "？核銷後即失效。")) return;
+      btn.disabled = true;
+      const r = await api("staffRedeem", { claimId: claimId });
+      if (r.status === "ok") {
+        alert("核銷成功");
+        lookup();
+        return;
+      }
+      btn.disabled = false;
+      const m = { redeemed: "此券已核銷過", expired: "此券已逾期", notfound: "查無此券" };
+      alert(m[r.status] || errs[r.status] || errs.error);
+    }
+  </script>
+</body>
+</html>
