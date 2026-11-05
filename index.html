@@ -1,283 +1,698 @@
-// ============================================================
-// 撒野計劃 雲端程式（Google Apps Script，綁定在 Google 試算表）
-// ============================================================
-const STAFF_PIN = "CHANGE_ME";   // 店員密碼，請改掉
-const CODE_TTL_MIN = 30;         // 通關碼產生後幾分鐘內有效
-const OPEN_HOUR = 9;             // 每天開放抓寶的開始時間（含），台灣時間
-const CLOSE_HOUR = 11;           // 每天結束時間（不含），11 表示 11:00 整就停止
-
-const POOL = [
-  {
-    name: "小省守護獸・10元怪",
-    prize: "折價券 10 元（限本月使用完畢）",
-    desc: "收服成功！憑此畫面【結帳總金額直接折抵 10 元】（非打折），請於本月使用完畢喔！",
-    weight: 0.25
-  },
-  {
-    name: "回甘茶仙・紅茶怪",
-    prize: "不多不少中杯紅茶一杯",
-    desc: "捕捉到清涼茶仙！結帳出示畫面，兌換中杯紅茶一杯！",
-    weight: 0.50
-  },
-  {
-    name: "睡睡怪",
-    prize: "請填寫睡睡怪的獎品",
-    desc: "請填寫睡睡怪的說明文字",
-    weight: 0.15
-  },
-  {
-    name: "飽足堡主・漢堡怪",
-    prize: "豬肉漢堡堡一顆",
-    desc: "太幸運啦！捕獲超人氣飽足怪，送您豬肉漢堡堡一顆！",
-    weight: 0.10
-  }
-];
-
-const CODE_HEADERS = ["code", "createdAt", "usedAt", "token"];
-const CLAIM_HEADERS = ["token", "drawnAt", "monsterIdx", "phone", "claimedAt", "claimId", "redeemedAt"];
-const ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function doGet() {
-  return out_({ status: "ok" });
-}
-
-function doPost(e) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
-  try {
-    const d = JSON.parse(e.postData.contents);
-    switch (d.action) {
-      case "verify": return out_(verify_(d));
-      case "reveal": return out_(reveal_(d));
-      case "claim": return out_(claim_(d));
-      case "status": return out_(status_(d));
-      case "staffPing": return out_(staffGate_(d) || { status: "ok", ttlMin: CODE_TTL_MIN });
-      case "staffNewCode": return out_(staffGate_(d) || staffNewCode_());
-      case "staffLookup": return out_(staffGate_(d) || staffLookup_(d));
-      case "staffRedeem": return out_(staffGate_(d) || staffRedeem_(d));
-      default: return out_({ status: "error" });
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>門市限定・撒野計劃</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      background: radial-gradient(circle at center, #1b263b 0%, #0d1b2a 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 100vh;
+      overflow: hidden;
+      padding: 24px 16px;
     }
-  } catch (err) {
-    return out_({ status: "error", message: String(err) });
-  } finally {
-    lock.releaseLock();
-  }
-}
 
-function out_(o) {
-  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
-}
-
-function sheet_(name, headers) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sh = ss.getSheetByName(name);
-  if (!sh) {
-    sh = ss.insertSheet(name);
-    sh.getRange(1, 1, sh.getMaxRows(), headers.length).setNumberFormat("@");
-    sh.appendRow(headers);
-  }
-  return sh;
-}
-
-function rows_(sh) {
-  return sh.getDataRange().getValues();
-}
-
-function monsterView_(idx) {
-  const i = Number(idx);
-  const m = POOL[i];
-  return { idx: i, name: m.name, prize: m.prize, desc: m.desc };
-}
-
-// 券的有效期限：領取當月的最後一天 23:59:59（台灣時間）
-function monthEnd_(ts) {
-  const local = new Date(Number(ts) + 8 * 3600000);
-  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + 1, 1) - 8 * 3600000 - 1;
-}
-
-function claimView_(r) {
-  const claimedAt = Number(r[4]);
-  return {
-    claimId: String(r[5]),
-    monster: monsterView_(r[2]),
-    claimedAt: claimedAt,
-    expiresAt: monthEnd_(claimedAt),
-    redeemed: !!r[6],
-    redeemedAt: r[6] ? Number(r[6]) : null
-  };
-}
-
-function drawIndex_() {
-  const r = Math.random();
-  let acc = 0;
-  for (let i = 0; i < POOL.length; i++) {
-    acc += POOL[i].weight;
-    if (r <= acc) return i;
-  }
-  return POOL.length - 1;
-}
-
-function newClaimId_(rows) {
-  while (true) {
-    let id = "";
-    for (let k = 0; k < 6; k++) id += ID_CHARS.charAt(Math.floor(Math.random() * ID_CHARS.length));
-    let clash = false;
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][5]) === id) { clash = true; break; }
+    .top-bar { width: 100%; max-width: 320px; text-align: center; }
+    .top-bar h1 { font-size: 1.25rem; color: #48cae4; margin-bottom: 4px; letter-spacing: 1px; }
+    .status-pill {
+      display: inline-block;
+      font-size: 0.8rem;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 12px;
+      border-radius: 20px;
+      color: #90e0ef;
     }
-    if (!clash) return id;
-  }
-}
 
-// ---------- 客人 ----------
-
-// 驗證通關碼：單次使用，成功後在雲端抽獎並記錄（結果此時不回傳）
-function verify_(d) {
-  const cache = CacheService.getScriptCache();
-  const fails = Number(cache.get("fails") || 0);
-  if (fails >= 30) return { status: "locked" };
-
-  const hour = Number(Utilities.formatDate(new Date(), "Asia/Taipei", "H"));
-  if (hour < OPEN_HOUR || hour >= CLOSE_HOUR) return { status: "closed" };
-
-  const code = String(d.code || "").trim();
-  const sh = sheet_("sy_codes", CODE_HEADERS);
-  const rows = rows_(sh);
-  const now = Date.now();
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === code) {
-      if (rows[i][2]) return { status: "used" };
-      if (now - Number(rows[i][1]) > CODE_TTL_MIN * 60000) return { status: "expired" };
-      const token = Utilities.getUuid().replace(/-/g, "").slice(0, 16);
-      sh.getRange(i + 1, 3, 1, 2).setValues([[now, token]]);
-      sheet_("sy_claims", CLAIM_HEADERS).appendRow([token, now, drawIndex_(), "", "", "", ""]);
-      return { status: "ok", token: token };
+    /* 雷達視窗 */
+    .radar-wrapper {
+      position: relative;
+      width: 320px;
+      height: 360px;
+      background: radial-gradient(circle, #1e3d59 0%, #17252a 80%);
+      border: 3px solid #48cae4;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 0 25px rgba(72, 202, 228, 0.2);
     }
-  }
-  cache.put("fails", String(fails + 1), 300);
-  return { status: "invalid" };
-}
 
-// 抓到之後才揭曉結果
-function reveal_(d) {
-  const rows = rows_(sheet_("sy_claims", CLAIM_HEADERS));
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(d.token)) {
-      return { status: "ok", monster: monsterView_(rows[i][2]) };
+    #gameCanvas { width: 100%; height: 100%; touch-action: none; display: block; position: absolute; inset: 0; z-index: 2; }
+
+    /* 怪獸影片浮動視窗 (圓形懸浮) */
+    #monsterVideo {
+      position: absolute;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: none;
+      z-index: 3;
+      pointer-events: none;
+      box-shadow: 0 0 16px rgba(255,255,255,0.6);
+      border: 2px solid #ffffff;
+      left: 120px;
+      top: 50px;
     }
-  }
-  return { status: "notoken" };
-}
 
-// 綁定手機號碼並領取；同號碼只能領一次
-function claim_(d) {
-  const phone = String(d.phone || "").trim();
-  if (!/^09\d{8}$/.test(phone)) return { status: "badphone" };
-  const sh = sheet_("sy_claims", CLAIM_HEADERS);
-  const rows = rows_(sh);
-  let mine = -1;
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(d.token)) { mine = i; break; }
-  }
-  if (mine < 0) return { status: "notoken" };
-
-  if (rows[mine][3]) {
-    if (String(rows[mine][3]) !== phone) return { status: "error" };
-    return Object.assign({ status: "ok" }, claimView_(rows[mine]));
-  }
-  for (let i = 1; i < rows.length; i++) {
-    if (i !== mine && String(rows[i][3]) === phone) {
-      return Object.assign({ status: "duplicate" }, claimView_(rows[i]));
+    .radar-scanner {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: conic-gradient(from 0deg, rgba(72, 202, 228, 0.35) 0deg, transparent 60deg);
+      animation: scan 2s linear infinite;
+      pointer-events: none;
+      display: none;
+      z-index: 1;
     }
-  }
-  const now = Date.now();
-  const claimId = newClaimId_(rows);
-  sh.getRange(mine + 1, 4, 1, 3).setValues([[phone, now, claimId]]);
-  rows[mine][3] = phone;
-  rows[mine][4] = now;
-  rows[mine][5] = claimId;
-  return Object.assign({ status: "ok" }, claimView_(rows[mine]));
-}
-
-// 客人券面查詢（重新整理後還原、輪詢是否已核銷）
-function status_(d) {
-  const id = String(d.claimId || "").trim().toUpperCase();
-  const rows = rows_(sheet_("sy_claims", CLAIM_HEADERS));
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][5] && String(rows[i][5]) === id) {
-      return Object.assign({ status: "ok" }, claimView_(rows[i]));
+    @keyframes scan {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
-  }
-  return { status: "notfound" };
-}
 
-// ---------- 店員 ----------
+    .tip-text { font-size: 0.85rem; color: #adb5bd; margin-bottom: 8px; text-align: center; }
 
-function staffGate_(d) {
-  const cache = CacheService.getScriptCache();
-  const f = Number(cache.get("pinfails") || 0);
-  if (f >= 10) return { status: "locked" };
-  if (String(d.pin) !== STAFF_PIN) {
-    cache.put("pinfails", String(f + 1), 300);
-    return { status: "badpin" };
-  }
-  return null;
-}
-
-function staffNewCode_() {
-  const sh = sheet_("sy_codes", CODE_HEADERS);
-  const rows = rows_(sh);
-  let code;
-  while (true) {
-    code = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
-    let clash = false;
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]) === code) { clash = true; break; }
+    /* 彈窗樣式 */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }
-    if (!clash) break;
-  }
-  sh.appendRow([code, Date.now(), "", ""]);
-  return { status: "ok", code: code, ttlMin: CODE_TTL_MIN };
-}
-
-function staffLookup_(d) {
-  const q = String(d.q || "").trim().toUpperCase();
-  const rows = rows_(sheet_("sy_claims", CLAIM_HEADERS));
-  const now = Date.now();
-  const byPhone = /^\d{4,10}$/.test(q);
-  const list = [];
-  for (let i = rows.length - 1; i >= 1 && list.length < 5; i--) {
-    const r = rows[i];
-    if (!r[3]) continue;
-    const phone = String(r[3]);
-    if (String(r[5]) === q || (byPhone && phone.slice(-q.length) === q)) {
-      const v = claimView_(r);
-      list.push({
-        claimId: v.claimId,
-        phoneTail: phone.slice(-4),
-        monster: { name: v.monster.name, prize: v.monster.prize },
-        claimedAt: v.claimedAt,
-        expiresAt: v.expiresAt,
-        redeemed: v.redeemed,
-        expired: now > v.expiresAt
-      });
+    .card {
+      background: #1e293b;
+      border: 2px solid #48cae4;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
     }
-  }
-  return { status: "ok", results: list };
-}
+    .card h3 { font-size: 1.35rem; margin-bottom: 8px; }
+    .card p { font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 16px; }
 
-function staffRedeem_(d) {
-  const id = String(d.claimId || "").trim().toUpperCase();
-  const sh = sheet_("sy_claims", CLAIM_HEADERS);
-  const rows = rows_(sh);
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][5] && String(rows[i][5]) === id) {
-      if (rows[i][6]) return { status: "redeemed" };
-      const v = claimView_(rows[i]);
-      if (Date.now() > v.expiresAt) return { status: "expired" };
-      sh.getRange(i + 1, 7).setValue(Date.now());
-      return { status: "ok", monster: { name: v.monster.name, prize: v.monster.prize } };
+    .code-input {
+      width: 180px;
+      font-size: 1.5rem;
+      letter-spacing: 6px;
+      text-align: center;
+      padding: 8px 12px;
+      border: 2px solid #48cae4;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #fff;
+      outline: none;
+      margin-bottom: 16px;
     }
-  }
-  return { status: "notfound" };
-}
+
+    .coupon-box {
+      background: #fff;
+      color: #0f172a;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+      border-left: 6px dashed #48cae4;
+      text-align: center;
+    }
+    .coupon-name { font-size: 1.15rem; font-weight: bold; color: #0284c7; }
+    .countdown { font-size: 0.75rem; color: #e11d48; margin-top: 4px; font-weight: bold; }
+
+    .btn {
+      background: #48cae4;
+      color: #0b132b;
+      border: none;
+      font-weight: bold;
+      padding: 12px 24px;
+      border-radius: 25px;
+      width: 100%;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .btn:disabled { opacity: 0.6; }
+    .btn-secondary { background: #475569; color: #fff; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <h1>門市限定・撒野計劃</h1>
+    <div class="status-pill" id="statusPill">📡 正在連接 GPS 雷達...</div>
+  </div>
+
+  <div class="radar-wrapper">
+    <div class="radar-scanner" id="scanner"></div>
+    <video id="monsterVideo" autoplay loop muted playsinline webkit-playsinline></video>
+    <canvas id="gameCanvas" width="320" height="360"></canvas>
+  </div>
+
+  <div class="tip-text" id="tipText">雷達定位中，請允許位置存取...</div>
+
+  <!-- 消費驗證彈窗 -->
+  <div class="modal" id="authModal">
+    <div class="card">
+      <h3 style="color: #38bdf8;">🔒 啟動雷達鎖定</h3>
+      <p>本活動限定<b>店內消費</b>參與。<br>請輸入店員提供的 6 位數通關碼：</p>
+      <input type="tel" inputmode="numeric" class="code-input" id="passcodeInput" placeholder="••••••" maxlength="6">
+      <button class="btn" id="verifyBtn" onclick="verifyReceiptCode()">解鎖雷達開始撒野</button>
+      <p id="authError" style="color: #fb7185; font-size: 0.8rem; margin-top: 10px; margin-bottom: 0; display: none;">通關碼錯誤，請洽櫃檯店員</p>
+    </div>
+  </div>
+
+  <!-- 領取綁定手機彈窗 -->
+  <div class="modal" id="claimModal">
+    <div class="card">
+      <h3 style="color: #48cae4;">🎉 成功捕獲野生目標！</h3>
+      <p id="claimMonster" style="color: #facc15; font-size: 1.1rem; font-weight: bold; margin-bottom: 12px;"></p>
+      <div class="coupon-box">
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">獲得門市專屬兌換券</div>
+        <div class="coupon-name" id="claimPrize"></div>
+      </div>
+      <input type="tel" inputmode="numeric" class="code-input" id="phoneInput" style="width: 100%; font-size: 1rem; letter-spacing: 1px;" placeholder="請輸入手機號碼 (09xxxxxxxx)" maxlength="10">
+      <button class="btn" id="claimBtn" onclick="submitClaim()">確認綁定並領取</button>
+      <p id="claimMsg" style="color: #fb7185; font-size: 0.8rem; margin-top: 10px; margin-bottom: 0; display: none;"></p>
+      <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 10px; margin-bottom: 0;">每人限領一次，送出後即綁定此號碼</p>
+    </div>
+  </div>
+
+  <!-- 提示 / 結果彈窗 -->
+  <div class="modal" id="resultModal">
+    <div class="card">
+      <h3 id="modalTitle">🎉 撒野成果！</h3>
+      <p id="modalDesc"></p>
+
+      <div id="prizeSection" style="display: none;">
+        <div class="coupon-box">
+          <div class="coupon-name" id="couponText"></div>
+          <div id="claimIdText" style="font-size: 1.4rem; font-weight: bold; letter-spacing: 3px; margin-top: 8px; color: #0f172a;"></div>
+          <div class="countdown" id="timer"></div>
+          <div id="liveClock" style="font-size: 0.75rem; color: #64748b; margin-top: 4px;"></div>
+        </div>
+      </div>
+
+      <button class="btn" id="retryBtn" style="display: none;" onclick="initLocationCheck()">重新抓取位置</button>
+      <button class="btn btn-secondary" id="closeBtn" style="margin-top: 8px;" onclick="closeModal()">關閉</button>
+    </div>
+  </div>
+
+  <script>
+    const STORE_CONFIG = {
+      lat: 23.04722,
+      lng: 120.18278,
+      radiusMeters: 150,
+      // 貼上 Google Apps Script 的網頁應用程式網址
+      apiUrl: "https://script.google.com/macros/s/AKfycbwmo2Xrn9yLmELZeDDnl1oxbgBpSeHjrqyguau4WNEs47zTMLiZysB25sDrhK9Vx2N-uQ/exec"
+    };
+
+    const VIDEOS = ["monster_1.png.MP4", "monster_2.png.MP4"];
+    const STORAGE_KEY = "sayeh_played_v2";
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const monsterVideo = document.getElementById('monsterVideo');
+    const statusPill = document.getElementById('statusPill');
+    const tipText = document.getElementById('tipText');
+    const scanner = document.getElementById('scanner');
+    const authModal = document.getElementById('authModal');
+    const authError = document.getElementById('authError');
+    const verifyBtn = document.getElementById('verifyBtn');
+    const modal = document.getElementById('resultModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDesc = document.getElementById('modalDesc');
+    const prizeSection = document.getElementById('prizeSection');
+    const couponText = document.getElementById('couponText');
+    const retryBtn = document.getElementById('retryBtn');
+    const closeBtn = document.getElementById('closeBtn');
+    const claimModal = document.getElementById('claimModal');
+    const claimBtn = document.getElementById('claimBtn');
+    const claimMsg = document.getElementById('claimMsg');
+
+    let currentMonster = null;
+    let isSpawned = false;
+    let ball = { x: 160, y: 310, radius: 26, vx: 0, vy: 0, isThrown: false, isDragging: false, startX: 0, startY: 0 };
+    let isShaking = false;
+    let shakeCount = 0;
+    let couponState = null;
+    let tickHandle = null;
+    let pollHandle = null;
+
+    // ---------- 本機參加紀錄 ----------
+    function loadPlay() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+    }
+    function savePlay(p) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch (e) {}
+    }
+
+    // ---------- 雲端呼叫 ----------
+    async function api(action, payload) {
+      if (!STORE_CONFIG.apiUrl) return { status: "nourl" };
+      try {
+        const res = await fetch(STORE_CONFIG.apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(Object.assign({ action: action }, payload))
+        });
+        return await res.json();
+      } catch (e) {
+        return { status: "neterr" };
+      }
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function initLocationCheck() {
+      modal.style.display = 'none';
+      retryBtn.style.display = 'none';
+      statusPill.innerText = "📡 正在確認店內位置...";
+
+      if (!navigator.geolocation) {
+        showPrompt("裝置不支援", "您的裝置未開放定位權限。");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const dist = getDistance(pos.coords.latitude, pos.coords.longitude, STORE_CONFIG.lat, STORE_CONFIG.lng);
+          if (dist > STORE_CONFIG.radiusMeters) {
+            statusPill.innerText = "未在店內";
+            showPrompt("未在門市範圍內", `目前距離門市約 ${Math.round(dist)} 公尺。<br>必須到店內現場才能啟動撒野雷達！`, true);
+          } else {
+            statusPill.innerText = "📍 已鎖定店內雷達";
+            statusPill.style.background = "#059669";
+            tipText.innerText = "請輸入店員提供的 6 位數通關碼";
+            authModal.style.display = 'flex';
+          }
+        },
+        (err) => {
+          statusPill.innerText = "定位中斷";
+          showPrompt("請允許 GPS 定位", "雷達需要確認您在店內現場，請在跳出的提示點擊「允許」。", true);
+        },
+        { enableHighAccuracy: true, timeout: 7000 }
+      );
+    }
+
+    function showPrompt(title, msg, showRetry = false) {
+      modalTitle.innerText = title;
+      modalTitle.style.color = "#f43f5e";
+      modalDesc.innerHTML = msg;
+      prizeSection.style.display = 'none';
+      retryBtn.style.display = showRetry ? 'block' : 'none';
+      closeBtn.innerText = "我知道了";
+      modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+      modal.style.display = 'none';
+      stopCouponTimers();
+    }
+
+    // ---------- 通關碼（由雲端驗證，單次使用）----------
+    async function verifyReceiptCode() {
+      const input = document.getElementById('passcodeInput').value.trim();
+      if (!/^\d{6}$/.test(input)) {
+        authError.innerText = "請輸入 6 位數通關碼";
+        authError.style.display = 'block';
+        return;
+      }
+      verifyBtn.disabled = true;
+      authError.style.display = 'none';
+      const r = await api("verify", { code: input });
+      verifyBtn.disabled = false;
+
+      if (r.status === "ok") {
+        savePlay({ token: r.token, stage: "verified" });
+        authModal.style.display = 'none';
+        startRadarScan();
+        return;
+      }
+      const msgs = {
+        invalid: "通關碼錯誤，請洽櫃檯店員",
+        used: "此通關碼已使用過，請洽櫃檯店員",
+        expired: "此通關碼已過期，請洽櫃檯店員重新取得",
+        closed: "碰碰愛玩溜走了～今天的抓寶時間（9:00–11:00）已結束，店內仍照常營業，歡迎進來坐坐！",
+        locked: "嘗試次數過多，請稍後再試",
+        neterr: "網路連線失敗，請稍後再試",
+        nourl: "系統尚未設定完成，請洽櫃檯店員"
+      };
+      authError.innerText = msgs[r.status] || "發生錯誤，請洽櫃檯店員";
+      authError.style.display = 'block';
+    }
+
+    function startRadarScan() {
+      scanner.style.display = 'block';
+      statusPill.innerText = "雷達感應中...";
+      statusPill.style.background = "#0284c7";
+      tipText.innerText = "正在搜尋野生美味，請屏息以待...";
+
+      setTimeout(() => {
+        scanner.style.display = 'none';
+        spawnMonster();
+      }, 2000);
+    }
+
+    function spawnMonster() {
+      currentMonster = {
+        videoSrc: VIDEOS[Math.floor(Math.random() * VIDEOS.length)],
+        x: 118,
+        y: 40,
+        radius: 42,
+        vx: (Math.random() > 0.5 ? 1.2 : -1.2),
+        vy: (Math.random() > 0.5 ? 0.7 : -0.7),
+        isCaptured: false
+      };
+
+      // 載入並強制播放 MP4 影片浮層
+      monsterVideo.src = currentMonster.videoSrc + "?v=" + new Date().getTime();
+      monsterVideo.style.display = 'block';
+      monsterVideo.style.left = currentMonster.x + 'px';
+      monsterVideo.style.top = currentMonster.y + 'px';
+      monsterVideo.play().catch(e => console.log('Autoplay handled:', e));
+
+      ball.x = 160;
+      ball.y = 310;
+      ball.isThrown = false;
+      ball.isDragging = false;
+      isSpawned = true;
+
+      // 抓到之前不透露是哪一隻、什麼獎品
+      statusPill.innerText = "⚠️ 發現【野生目標】！";
+      statusPill.style.background = "#e63946";
+      tipText.innerText = "按住下方小手手 🖐️，向上滑動去抓！";
+    }
+
+    function loop() {
+      if (isSpawned && currentMonster && !currentMonster.isCaptured && !isShaking) {
+        currentMonster.x += currentMonster.vx;
+        currentMonster.y += currentMonster.vy;
+
+        if (currentMonster.x < 15 || currentMonster.x > 220) {
+          currentMonster.vx *= -1;
+        }
+        if (currentMonster.y < 15 || currentMonster.y > 130) {
+          currentMonster.vy *= -1;
+        }
+
+        // 同步更新影片在畫面上的實體位置
+        monsterVideo.style.left = currentMonster.x + 'px';
+        monsterVideo.style.top = currentMonster.y + 'px';
+      }
+
+      if (ball.isThrown && !isShaking) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        if (isSpawned && currentMonster && !currentMonster.isCaptured && ball.y < 220) {
+          const centerX = currentMonster.x + 42;
+          const centerY = currentMonster.y + 42;
+          const dist = Math.hypot(ball.x - centerX, ball.y - centerY);
+          if (dist < ball.radius + 42) {
+            triggerHit();
+          }
+        }
+
+        if (ball.y < -30 || ball.x < -30 || ball.x > canvas.width + 30) {
+          resetBall();
+        }
+      }
+
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 背景雷達線
+      ctx.save();
+      ctx.strokeStyle = "rgba(72, 202, 228, 0.2)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(160, 180, 50, 0, Math.PI * 2);
+      ctx.arc(160, 180, 100, 0, Math.PI * 2);
+      ctx.arc(160, 180, 150, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // 小手手 (張開 🖐️ / 抓取 ✊)
+      if (isSpawned) {
+        ctx.save();
+        ctx.font = "46px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const handEmoji = ball.isThrown ? "✊" : "🖐️";
+        ctx.fillText(handEmoji, ball.x, ball.y);
+        ctx.restore();
+      }
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (!isSpawned || ball.isThrown || isShaking) return;
+      const t = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const tx = t.clientX - rect.left;
+      const ty = t.clientY - rect.top;
+
+      if (Math.hypot(tx - ball.x, ty - ball.y) < 45) {
+        ball.isDragging = true;
+        ball.startX = tx;
+        ball.startY = ty;
+      }
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (ball.isDragging) {
+        const t = e.changedTouches[0];
+        const rect = canvas.getBoundingClientRect();
+        const dy = (t.clientY - rect.top) - ball.startY;
+        const dx = (t.clientX - rect.left) - ball.startX;
+
+        if (dy < -20) {
+          ball.vx = dx * 0.15;
+          ball.vy = dy * 0.22;
+          ball.isThrown = true;
+        }
+        ball.isDragging = false;
+      }
+    });
+
+    function triggerHit() {
+      currentMonster.isCaptured = true;
+      ball.isThrown = false;
+      isShaking = true;
+      shakeCount = 0;
+      tipText.innerText = "🎯 抓到了！拉回中...";
+
+      monsterVideo.style.display = 'none';
+
+      const interval = setInterval(() => {
+        shakeCount++;
+        ball.x += (shakeCount % 2 === 0 ? 6 : -6);
+
+        if (shakeCount >= 6) {
+          clearInterval(interval);
+          isShaking = false;
+          showOutcome();
+        }
+      }, 250);
+    }
+
+    function resetBall() {
+      ball.x = 160;
+      ball.y = 310;
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.isThrown = false;
+      tipText.innerText = "沒抓到！快再試一次！";
+    }
+
+    // ---------- 抓到後：向雲端取得結果 ----------
+    async function showOutcome() {
+      statusPill.innerText = "🎯 已捕獲";
+      const play = loadPlay();
+      if (play) { play.stage = "caught"; savePlay(play); }
+      await doReveal();
+    }
+
+    async function doReveal() {
+      const play = loadPlay();
+      if (!play || !play.token) return;
+      const r = await api("reveal", { token: play.token });
+      if (r.status === "ok") {
+        openClaimModal(r.monster);
+      } else {
+        showPrompt("連線失敗", "無法取得結果，請確認網路後重新整理頁面，會從這裡繼續。");
+      }
+    }
+
+    function openClaimModal(monster) {
+      document.getElementById('claimMonster').innerText = "【" + monster.name + "】";
+      document.getElementById('claimPrize').innerText = monster.prize;
+      claimMsg.style.display = 'none';
+      claimBtn.disabled = false;
+      claimBtn.innerText = "確認綁定並領取";
+      claimModal.style.display = 'flex';
+    }
+
+    function showClaimMsg(text) {
+      claimMsg.innerText = text;
+      claimMsg.style.display = 'block';
+    }
+
+    async function submitClaim() {
+      const phone = document.getElementById('phoneInput').value.trim();
+      if (!/^09\d{8}$/.test(phone)) {
+        showClaimMsg("請輸入正確的手機號碼（09 開頭，共 10 碼）");
+        return;
+      }
+      const play = loadPlay();
+      if (!play || !play.token) return;
+
+      claimBtn.disabled = true;
+      claimBtn.innerText = "確認中...";
+      const r = await api("claim", { token: play.token, phone: phone });
+
+      if (r.status === "ok" || r.status === "duplicate") {
+        play.claimId = r.claimId;
+        play.stage = "claimed";
+        savePlay(play);
+        claimModal.style.display = 'none';
+        showCoupon(r, r.status === "duplicate" ? "dup" : "new");
+        return;
+      }
+      claimBtn.disabled = false;
+      claimBtn.innerText = "確認綁定並領取";
+      const msgs = {
+        badphone: "請輸入正確的手機號碼（09 開頭，共 10 碼）",
+        notoken: "資料已失效，請洽櫃檯店員",
+        neterr: "網路連線失敗，請稍後再試"
+      };
+      showClaimMsg(msgs[r.status] || "領取失敗，請洽櫃檯店員");
+    }
+
+    // ---------- 券面（核銷由店員在店員頁操作）----------
+    function showCoupon(data, mode) {
+      couponState = { expiresAt: data.expiresAt, redeemed: data.redeemed, claimId: data.claimId };
+      const m = data.monster;
+
+      if (mode === "dup") {
+        modalTitle.innerText = "此手機號碼已領取過優惠券";
+        modalDesc.innerHTML = "無法重複兌換，您先前的券面如下：";
+      } else if (mode === "returning") {
+        modalTitle.innerText = "您已參加過本次門市活動囉！";
+        modalDesc.innerHTML = "您的專屬兌換券如下：";
+      } else {
+        modalTitle.innerText = "🎉 撒野成果！";
+        modalDesc.innerHTML = m.desc;
+      }
+      modalTitle.style.color = "#48cae4";
+      couponText.innerText = m.prize;
+      document.getElementById('claimIdText').innerText = "兌換碼 " + data.claimId;
+      prizeSection.style.display = 'block';
+      retryBtn.style.display = 'none';
+      closeBtn.innerText = mode === "new" ? "完成" : "我知道了";
+      modal.style.display = 'flex';
+
+      startCouponTimers();
+    }
+
+    function stopCouponTimers() {
+      if (tickHandle) { clearInterval(tickHandle); tickHandle = null; }
+      if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+    }
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function tickCoupon() {
+      if (!couponState) return;
+      const el = document.getElementById('timer');
+      const now = new Date();
+      document.getElementById('liveClock').innerText =
+        now.getFullYear() + "/" + pad2(now.getMonth() + 1) + "/" + pad2(now.getDate()) + " " +
+        pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());
+
+      if (couponState.redeemed) { el.innerText = "此券已核銷"; return; }
+      const left = couponState.expiresAt - Date.now();
+      if (left <= 0) { el.innerText = "優惠已失效"; return; }
+      if (left > 3600000) {
+        const d = new Date(couponState.expiresAt);
+        el.innerText = "有效至 " + (d.getMonth() + 1) + "/" + d.getDate() + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + "，請出示給店員核銷";
+        return;
+      }
+      const s = Math.floor(left / 1000);
+      el.innerText = "請於 " + pad2(Math.floor(s / 60)) + ":" + pad2(s % 60) + " 內出示給店員核銷";
+    }
+
+    function startCouponTimers() {
+      stopCouponTimers();
+      tickCoupon();
+      tickHandle = setInterval(tickCoupon, 1000);
+      pollHandle = setInterval(async () => {
+        if (!couponState || couponState.redeemed) return;
+        const r = await api("status", { claimId: couponState.claimId });
+        if (r.status === "ok" && r.redeemed) {
+          couponState.redeemed = true;
+          tickCoupon();
+        }
+      }, 5000);
+    }
+
+    // ---------- 抓寶時間（台灣時間 9:00–11:00）----------
+    function inCatchHours() {
+      const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", hour: "numeric", hourCycle: "h23" }).format(new Date()));
+      return h >= 9 && h < 11;
+    }
+
+    function showSleepy() {
+      statusPill.innerText = "碰碰愛玩溜走了";
+      tipText.innerText = "今天的抓寶時間已結束";
+      showPrompt("碰碰愛玩溜走了～", "今天的抓寶時間（9:00–11:00）已經結束囉！<br>店內仍照常營業，歡迎進來坐坐～");
+      modalTitle.style.color = "#48cae4";
+    }
+
+    // ---------- 重新打開網頁時還原 ----------
+    async function resumeClaimed(play) {
+      statusPill.innerText = "已參加過本次活動";
+      tipText.innerText = "每支手機限抓一次";
+      const r = await api("status", { claimId: play.claimId });
+      if (r.status === "ok") {
+        showCoupon(r, "returning");
+      } else {
+        showPrompt("連線失敗", "無法取得您的券面，請確認網路後重新整理頁面。");
+      }
+    }
+
+    const existingPlay = loadPlay();
+    if (existingPlay && existingPlay.claimId) {
+      resumeClaimed(existingPlay);
+    } else if (existingPlay && existingPlay.stage === "caught") {
+      statusPill.innerText = "🎯 已捕獲";
+      doReveal();
+    } else if (existingPlay && existingPlay.stage === "verified") {
+      startRadarScan();
+    } else if (!inCatchHours()) {
+      showSleepy();
+    } else {
+      initLocationCheck();
+    }
+    loop();
+  </script>
+</body>
+</html>
