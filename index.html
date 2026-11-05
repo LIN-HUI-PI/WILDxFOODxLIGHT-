@@ -3,7 +3,8 @@
 // ============================================================
 const STAFF_PIN = "CHANGE_ME";   // 店員密碼，請改掉
 const CODE_TTL_MIN = 30;         // 通關碼產生後幾分鐘內有效
-const COUPON_TTL_MIN = 15;       // 領券後幾分鐘內要核銷（想整個月有效可改 43200）
+const OPEN_HOUR = 9;             // 每天開放抓寶的開始時間（含），台灣時間
+const CLOSE_HOUR = 11;           // 每天結束時間（不含），11 表示 11:00 整就停止
 
 const POOL = [
   {
@@ -88,13 +89,19 @@ function monsterView_(idx) {
   return { idx: i, name: m.name, prize: m.prize, desc: m.desc };
 }
 
+// 券的有效期限：領取當月的最後一天 23:59:59（台灣時間）
+function monthEnd_(ts) {
+  const local = new Date(Number(ts) + 8 * 3600000);
+  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + 1, 1) - 8 * 3600000 - 1;
+}
+
 function claimView_(r) {
   const claimedAt = Number(r[4]);
   return {
     claimId: String(r[5]),
     monster: monsterView_(r[2]),
     claimedAt: claimedAt,
-    expiresAt: claimedAt + COUPON_TTL_MIN * 60000,
+    expiresAt: monthEnd_(claimedAt),
     redeemed: !!r[6],
     redeemedAt: r[6] ? Number(r[6]) : null
   };
@@ -129,6 +136,9 @@ function verify_(d) {
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get("fails") || 0);
   if (fails >= 30) return { status: "locked" };
+
+  const hour = Number(Utilities.formatDate(new Date(), "Asia/Taipei", "H"));
+  if (hour < OPEN_HOUR || hour >= CLOSE_HOUR) return { status: "closed" };
 
   const code = String(d.code || "").trim();
   const sh = sheet_("sy_codes", CODE_HEADERS);
