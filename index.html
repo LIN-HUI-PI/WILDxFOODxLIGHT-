@@ -105,21 +105,26 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* 未知野生物件目標 (不給看是哪隻怪) */
+    /* 雷達中的怪獸目標點（直接使用怪獸 SVG 頭像） */
     .target-dot {
       position: absolute;
-      width: 58px;
-      height: 58px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
-      border: 3px solid #ffffff;
-      background: rgba(255, 255, 255, 0.15);
-      box-shadow: 0 0 20px #ffffff, inset 0 0 10px #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.8), 0 0 28px rgba(56, 189, 248, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
       cursor: pointer;
-      animation: dotGlow 1.5s infinite alternate ease-in-out;
+      animation: dotGlow 1.6s infinite alternate ease-in-out;
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+    .target-dot svg, .target-dot img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     @keyframes dotGlow {
       0% { transform: scale(0.95); box-shadow: 0 0 12px #ffffff; }
@@ -175,11 +180,28 @@
       text-align: center;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
     }
+    .monster-avatar-modal {
+      width: 90px;
+      height: 90px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      border: 3px solid #facc15;
+      background: #ffffff;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .monster-avatar-modal svg, .monster-avatar-modal img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
     .modal-title {
       font-size: 18px;
       font-weight: 700;
       color: #38bdf8;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .monster-badge {
       font-size: 20px;
@@ -245,9 +267,9 @@
   <!-- 頂部標題區域 -->
   <div class="header-area" id="headerArea">
     <div class="header-title">門市限定・撒野計劃</div>
-    <!-- 抓取前保持神祕，絕不出現怪物名字 -->
+    <!-- 抓取前保持神祕，不提前透露怪物名稱與獎項 -->
     <div class="alert-banner" id="radarAlert">
-      ⚠️ 雷達感應中：偵測到周圍訊號，快滑動捕捉！
+      ⚠️ 雷達感應中：前方有不明微弱訊號，快滑動捕捉！
     </div>
   </div>
 
@@ -259,9 +281,26 @@
     <div class="cross-line"></div>
     <div class="scanner"></div>
 
-    <!-- 未知的神祕光點（抓到前不透露身分） -->
+    <!-- 雷達中的小怪獸圖標 -->
     <div class="target-dot" id="targetDot" style="top: 60px; left: 45px;">
-      ❓
+      <!-- 若專案目錄下有名為 monster.png 的圖片檔，可改成 <img src="monster.png"> -->
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        <!-- 蝴蝶結 -->
+        <polygon points="76,26 88,18 84,32" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
+        <polygon points="86,34 98,24 94,38" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
+        <circle cx="85" cy="30" r="3.5" fill="#3b0712"/>
+        <!-- 粉紫波浪怪獸身體 -->
+        <path d="M 28,26 C 42,16 68,14 74,28 C 80,42 66,56 78,74 C 70,88 38,94 24,80 C 14,70 18,36 28,26 Z" 
+              fill="#bf6f82" stroke="#1e293b" stroke-width="5" stroke-linejoin="round"/>
+        <!-- 左眼 -->
+        <circle cx="38" cy="44" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
+        <circle cx="39" cy="44" r="2.2" fill="#0f172a"/>
+        <!-- 右眼 -->
+        <circle cx="62" cy="52" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
+        <circle cx="63" cy="52" r="2.2" fill="#0f172a"/>
+        <!-- 微笑嘴巴 -->
+        <path d="M 39,64 Q 45,74 54,66" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+      </svg>
     </div>
 
     <!-- 玩家滑動的小手手 -->
@@ -273,45 +312,56 @@
     按住下方小手手 🖐️，向上滑動去抓！
   </div>
 
-  <!-- 捕捉成功後彈窗（此時才揭曉怪獸本體與兌換券） -->
+  <!-- 捕捉成功後彈窗 -->
   <div class="modal-overlay" id="claimModal">
     <div class="modal-card">
-      <div class="modal-title">🎉 成功捕獲野生目標！</div>
-      <div class="monster-badge" id="modalMonsterName">【野生物件解鎖中】</div>
+      <div class="monster-avatar-modal" id="modalMonsterAvatar">
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          <polygon points="76,26 88,18 84,32" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
+          <polygon points="86,34 98,24 94,38" fill="#581c24" stroke="#1f2937" stroke-width="2"/>
+          <circle cx="85" cy="30" r="3.5" fill="#3b0712"/>
+          <path d="M 28,26 C 42,16 68,14 74,28 C 80,42 66,56 78,74 C 70,88 38,94 24,80 C 14,70 18,36 28,26 Z" 
+                fill="#bf6f82" stroke="#1e293b" stroke-width="5" stroke-linejoin="round"/>
+          <circle cx="38" cy="44" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="39" cy="44" r="2.2" fill="#0f172a"/>
+          <circle cx="62" cy="52" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="63" cy="52" r="2.2" fill="#0f172a"/>
+          <path d="M 39,64 Q 45,74 54,66" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="modal-title">🎉 成功捕獲夥伴！</div>
+      <div class="monster-badge" id="modalMonsterName">【微笑調皮鬼・明日怪】</div>
       <div class="reward-box">
         <div style="font-size:13px; color:#94a3b8; margin-bottom:6px;">獲得門市專屬兌換券</div>
-        <div class="reward-name" id="modalRewardName">活動折抵券</div>
+        <div class="reward-name" id="modalRewardName">主餐折抵 20 元優惠券</div>
       </div>
       <input type="tel" id="userPhone" class="input-field" placeholder="請輸入手機號碼 (09xxxxxxxx)" maxlength="10">
       <button class="submit-btn" id="claimBtn">確認綁定並領取</button>
-      <div style="font-size:11px; color:#64748b; margin-top:8px;">每人限領一次，送出後即綁定此號碼</div>
+      <div style="font-size:11px; color:#64748b; margin-top:8px;">每人限領一次，送出後即鎖定本機與門號</div>
     </div>
   </div>
 
-  <!-- 已領取過的鎖定卡片（防重複刷券專用） -->
+  <!-- 已領取過的鎖定卡片 -->
   <div class="locked-view" id="lockedView">
     <div style="font-size: 32px; margin-bottom: 12px;">✅</div>
     <div style="font-size: 20px; font-weight:700; color:#38bdf8; margin-bottom: 8px;">您已完成本門市活動</div>
     <p style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">同台裝置或手機門號僅限領取一次</p>
     
     <div class="reward-box" style="text-align: left;">
-      <div style="font-size:12px; color:#94a3b8;">綁定手機：<span id="lockedPhone" style="color:#ffffff;">09xxxxxxxx</span></div>
-      <div style="font-size:12px; color:#94a3b8; margin-top:4px;">捕獲夥伴：<span id="lockedMonster" style="color:#facc15;">-</span></div>
-      <div style="font-size:14px; color:#4ade80; font-weight:700; margin-top:8px;" id="lockedReward">-</div>
+      <div style="font-size:12px; color:#94a3b8;">綁定門號：<span id="lockedPhone" style="color:#ffffff;">09xxxxxxxx</span></div>
+      <div style="font-size:12px; color:#94a3b8; margin-top:4px;">捕獲夥伴：<span id="lockedMonster" style="color:#facc15;">微笑調皮鬼・明日怪</span></div>
+      <div style="font-size:14px; color:#4ade80; font-weight:700; margin-top:8px;" id="lockedReward">主餐折抵 20 元優惠券</div>
     </div>
 
     <div style="font-size: 12px; color: #64748b;">結帳時請主動出示此畫面給門市夥伴確認</div>
   </div>
 
   <script>
-    // 怪物清單庫（捕捉前完全隱蔽，不寫在前端標籤裡）
-    const REWARD_DATABASE = [
-      { name: "微笑調皮鬼・明日怪", reward: "野食光 主餐折抵 20 元券" },
-      { name: "日光飽飽獸・元氣怪", reward: "美式黑咖啡 / 經典紅茶 兌換券" },
-      { name: "晨光散步精靈", reward: "特製手作小點心 招待券" }
-    ];
+    const MONSTER_INFO = {
+      name: "微笑調皮鬼・明日怪",
+      reward: "主餐折抵 20 元優惠券"
+    };
 
-    let currentTarget = null;
     let isDragging = false;
     let startX = 0, startY = 0;
     let initLeft = 130, initBottom = 24;
@@ -326,7 +376,7 @@
     const headerArea = document.getElementById('headerArea');
     const footerHint = document.getElementById('footerHint');
 
-    // 1. 頁面載入：檢查本機是否已經玩過領過
+    // 1. 頁面載入時檢查是否已領取過
     window.addEventListener('DOMContentLoaded', () => {
       const savedRecord = localStorage.getItem('yeshiguang_user_coupon');
       if (savedRecord) {
@@ -336,20 +386,17 @@
       }
     });
 
-    // 2. 初始化遊戲：隨機抽怪，但雷達上方「絕對不劇透」
+    // 2. 初始化怪獸位置（隨機分布在雷達上半部）
     function initGame() {
-      currentTarget = REWARD_DATABASE[Math.floor(Math.random() * REWARD_DATABASE.length)];
-
-      // 隨機在雷達上半部放置光點位置
-      const randomX = Math.floor(Math.random() * 200) + 30;
-      const randomY = Math.floor(Math.random() * 120) + 40;
+      const randomX = Math.floor(Math.random() * 180) + 40;
+      const randomY = Math.floor(Math.random() * 110) + 40;
       targetDot.style.left = `${randomX}px`;
       targetDot.style.top = `${randomY}px`;
 
       setupHandTouchControls();
     }
 
-    // 3. 小手拖曳滑動捕捉監聽
+    // 3. 拖曳手勢捕捉
     function setupHandTouchControls() {
       handGrabber.addEventListener('pointerdown', (e) => {
         isDragging = true;
@@ -366,27 +413,24 @@
         let newLeft = initLeft + deltaX;
         let newBottom = initBottom - deltaY;
 
-        // 限制拖曳範圍在雷達內
         newLeft = Math.max(10, Math.min(250, newLeft));
         newBottom = Math.max(10, Math.min(250, newBottom));
 
         handGrabber.style.left = `${newLeft}px`;
         handGrabber.style.bottom = `${newBottom}px`;
 
-        // 碰撞檢測：當小手靠近光點時完成捕捉
         checkCollision();
       });
 
       handGrabber.addEventListener('pointerup', () => {
         if (!isDragging) return;
         isDragging = false;
-        // 未抓到時小手彈回原點
         handGrabber.style.left = `${initLeft}px`;
         handGrabber.style.bottom = `${initBottom}px`;
       });
     }
 
-    // 檢測是否成功碰觸到光點
+    // 檢測小手與怪獸距離
     function checkCollision() {
       const handRect = handGrabber.getBoundingClientRect();
       const dotRect = targetDot.getBoundingClientRect();
@@ -398,56 +442,53 @@
 
       const distance = Math.hypot(handCenterX - dotCenterX, handCenterY - dotCenterY);
 
-      if (distance < 45) { // 碰到了！
+      if (distance < 48) { // 成功碰觸怪獸
         isDragging = false;
         onCatchSuccess();
       }
     }
 
-    // 4. 成功捕捉：這時才揭曉怪物名字與獎項
+    // 4. 成功抓到怪獸
     function onCatchSuccess() {
       targetDot.style.display = 'none';
-      document.getElementById('modalMonsterName').innerText = `【${currentTarget.name}】`;
-      document.getElementById('modalRewardName').innerText = currentTarget.reward;
+      document.getElementById('modalMonsterName').innerText = `【${MONSTER_INFO.name}】`;
+      document.getElementById('modalRewardName').innerText = MONSTER_INFO.reward;
       claimModal.style.display = 'flex';
     }
 
-    // 5. 點擊領取按鈕：執行手機號碼驗證與防刷儲存
+    // 5. 門號防重複領取驗證
     claimBtn.addEventListener('click', () => {
       const phone = userPhoneInput.value.trim();
 
-      // 手機號碼格式防呆
       if (!/^09\d{8}$/.test(phone)) {
         alert("請輸入正確的手機號碼（共10碼，例如：0912345678）");
         return;
       }
 
-      // 檢查本機儲存的所有曾領取號碼清單
-      const claimedList = JSON.parse(localStorage.getItem('yeshiguang_claimed_phones') || '[]');
-      if (claimedList.includes(phone)) {
+      // 檢查此號碼是否曾被領取過
+      const claimedPhones = JSON.parse(localStorage.getItem('yeshiguang_claimed_phones') || '[]');
+      if (claimedPhones.includes(phone)) {
         alert("⚠️ 此手機號碼已經領取過獎項囉！無法重複領取。");
         return;
       }
 
-      // 通過檢查：加入號碼黑名單防刷
-      claimedList.push(phone);
-      localStorage.setItem('yeshiguang_claimed_phones', JSON.stringify(claimedList));
+      claimedPhones.push(phone);
+      localStorage.setItem('yeshiguang_claimed_phones', JSON.stringify(claimedPhones));
 
-      // 鎖死本機當前持有的票券紀錄
       const couponRecord = {
         phone: phone,
-        monster: currentTarget.name,
-        reward: currentTarget.reward,
+        monster: MONSTER_INFO.name,
+        reward: MONSTER_INFO.reward,
         date: new Date().toLocaleDateString('zh-TW')
       };
       localStorage.setItem('yeshiguang_user_coupon', JSON.stringify(couponRecord));
 
       claimModal.style.display = 'none';
-      alert(`🎉 恭喜！兌換券已成功綁定至手機號碼：${phone}`);
+      alert(`🎉 恭喜！兌換券已成功綁定至手機：${phone}`);
       showLockedScreen(couponRecord);
     });
 
-    // 6. 鎖定畫面：隱藏雷達，固定顯示已領取的票券
+    // 6. 鎖定畫面
     function showLockedScreen(record) {
       headerArea.style.display = 'none';
       radarContainer.style.display = 'none';
